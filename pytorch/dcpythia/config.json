@@ -1,0 +1,36 @@
+{
+  "architectures": [
+    "DCPythia"
+  ],
+  "auto_map": {
+    "AutoConfig": "configuration_dcpythia.DCPythiaConfig",
+    "AutoModelForCausalLM": "modeling_dcpythia.DCPythia"
+  },
+  "block_size": 2048,
+  "bos_token_id": 0,
+  "dim": 4096,
+  "eos_token_id": 0,
+  "head_dim": 128,
+  "intermediate_size": 16384,
+  "is_training": false,
+  "model_type": "dcpythia",
+  "n_head": 32,
+  "n_layer": 32,
+  "n_local_heads": 32,
+  "norm_eps": 1e-05,
+  "q_chunk_size": 128,
+  "query_wise": false,
+  "rope_base": 10000,
+  "rotary_pct": 0.25,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float16",
+  "transformers_version": "4.33.2",
+  "use_dcmha": true,
+  "use_gradient_checkpointing": false,
+  "use_linear_bias": true,
+  "use_parallel_residual": true,
+  "use_qk_norm": true,
+  "vocab_size": 50257,
+  "window_size": 256,
+  "window_type": null
+}
