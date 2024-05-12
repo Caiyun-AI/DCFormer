@@ -1,0 +1,33 @@
+{
+  "architectures": [
+    "DCFormer"
+  ],
+  "auto_map": {
+    "AutoConfig": "configuration_dcformer.DCFormerConfig",
+    "AutoModelForCausalLM": "modeling_dcformer.DCFormer"
+  },
+  "block_size": 2048,
+  "bos_token_id": 1,
+  "dim": 2560,
+  "eos_token_id": 2,
+  "head_dim": 80,
+  "intermediate_size": 6912,
+  "is_training": false,
+  "model_type": "dcformer",
+  "n_head": 32,
+  "n_layer": 32,
+  "n_local_heads": 32,
+  "norm_eps": 1e-06,
+  "q_chunk_size": 128,
+  "query_wise": false,
+  "rope_base": 10000,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float16",
+  "transformers_version": "4.33.2",
+  "use_dcmha": true,
+  "use_gradient_checkpointing": false,
+  "use_qk_norm": true,
+  "vocab_size": 50257,
+  "window_size": 256,
+  "window_type": null
+}
