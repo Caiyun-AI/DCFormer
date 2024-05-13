@@ -105,7 +105,7 @@ $PIP_OR_PYTHON_PATH/python MaxText/train.py MaxText/configs/$CONFIG_FILE run_nam
 
 ## Use Your Dataset
 
-You can change it to your own dataset by modifying the parameters ```dataset_path``` and ```dataset_type``` in the ```.yml``` config file (default dataset is ```pile```). In our library, only support ```c4``` and ```pile``` datasets. Other datasets may be added in the future. If need to use other self-processed or public datasets nowly, you can Add the corresponding data processing files or functions to the file input_pipeline directory. For detail, you can view function [ create_data_iterator_with_tokenizer](https://github.com/Caiyun-AI/DCFormer/blob/74e33be0a92caff3d56041d917e65569b1682dd2/jax/MaxText/input_pipeline/input_pipeline_interface.py#L252) in ```input_pipeline_interface.py```
+You can change it to your own dataset by modifying the parameters ```dataset_path``` and ```dataset_type``` in the ```.yml``` config file (default dataset is ```pile```). Meanwhile, you need add the corresponding data processing files or functions to the file input_pipeline directory. For detail, you can view function [ create_data_iterator_with_tokenizer](https://github.com/Caiyun-AI/DCFormer/blob/74e33be0a92caff3d56041d917e65569b1682dd2/jax/MaxText/input_pipeline/input_pipeline_interface.py#L252) in ```input_pipeline_interface.py```
 
 ## Tensorboard
 
