@@ -51,8 +51,8 @@ gcloud alpha compute tpus queued-resources create $TPU_NAME --node-id $TPU_NAME 
 #### 4. Install
 
 ```bash
-pip install -r jax/requirements_tpu.txt  # for tpu
-pip install -r jax/requirements_gpu.txt   # for gpu
+pip install -r requirements_tpu.txt  # for tpu
+pip install -r requirements_gpu.txt   # for gpu
 ```
 
 
