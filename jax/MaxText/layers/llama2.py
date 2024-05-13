@@ -18,10 +18,13 @@
 # pylint: disable=arguments-differ
 # pylint: disable=no-name-in-module
 import os
+from typing import Optional
 
 from flax import linen as nn
 from jax.sharding import Mesh
 import jax.numpy as jnp
+
+import common_types
 from layers import attentions
 from layers import embeddings
 from layers import linears
@@ -29,13 +32,10 @@ from layers import normalizations
 from layers import models
 
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+    Quant = None
 else:
     from layers import quantizations
     Quant = quantizations.AqtQuantization
-
-import common_types
-from typing import Optional
 
 Array = common_types.Array
 Config = common_types.Config

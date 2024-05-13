@@ -16,27 +16,26 @@
 # pylint: disable=arguments-differ
 # pylint: disable=no-name-in-module
 
-from typing import Callable, Optional
 import os
+from typing import Callable, Optional
 
 from flax import linen as nn
 import functools
 import jax
 import jax.numpy as jnp
+
 import common_types
 from layers import attentions
 from layers import embeddings
 from layers import linears
-
 from layers import normalizations
 from layers import initializers
 
-
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+  Quant = None
 else:
-    from layers import quantizations
-    Quant = quantizations.AqtQuantization
+  from layers import quantizations
+  Quant = quantizations.AqtQuantization
 
 NormalInitializer = initializers.nd_dense_init_normal
 

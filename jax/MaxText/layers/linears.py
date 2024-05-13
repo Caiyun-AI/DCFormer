@@ -20,21 +20,21 @@ import os
 from typing import Any, Callable, Iterable, Sequence, Tuple, Union, Optional
 
 from absl import logging
-
 import numpy as np
 import flax.linen as nn
 import jax
 from jax import lax
 import jax.numpy as jnp
+
 import common_types
 from layers import initializers
 from layers import normalizations
 
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+  Quant = None
 else:
-    from layers import quantizations
-    Quant = quantizations.AqtQuantization
+  from layers import quantizations
+  Quant = quantizations.AqtQuantization
 
 Array = common_types.Array
 Config = common_types.Config

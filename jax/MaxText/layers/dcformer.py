@@ -1,10 +1,11 @@
-from typing import Optional
 import os
+from typing import Optional
 
 import jax
 from flax import linen as nn
 from jax.sharding import Mesh
 import jax.numpy as jnp
+
 from layers import dc_attentions
 from layers import embeddings
 from layers import linears
@@ -14,7 +15,7 @@ from layers import initializers
 import tensorflow as tf
 
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+    Quant = None
 else:
     from layers import quantizations
     Quant = quantizations.AqtQuantization

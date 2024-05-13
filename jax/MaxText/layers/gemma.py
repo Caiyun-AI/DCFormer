@@ -14,6 +14,7 @@
  limitations under the License.
  """
 import os
+from typing import Optional
 
 from flax import linen as nn
 import common_types
@@ -26,13 +27,11 @@ from layers import embeddings
 from layers import linears
 
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+    Quant = None
 else:
     from layers import quantizations
     Quant = quantizations.AqtQuantization
 
-
-from typing import Optional
 
 Embed = embeddings.Embed
 RMSNorm = normalizations.RMSNorm

@@ -8,7 +8,6 @@ from typing import Optional, Sequence, Any
 from einops import rearrange, repeat
 from flax import linen as nn
 from flax.linen.linear import PrecisionLike
-
 import jax
 from jax import lax
 from jax import random
@@ -24,12 +23,12 @@ from einops import rearrange, repeat
 from layers import normalizations
 
 if os.environ["HARDWARE"] == "gpu":
-   Quant = None
+  Quant = None
 else:
-    from layers import quantizations
-    from jax.experimental.pallas.ops.tpu.splash_attention import splash_attention_mask
-    from jax.experimental.pallas.ops.tpu.splash_attention import splash_attention_kernel
-    Quant = quantizations.AqtQuantization
+  from layers import quantizations
+  from jax.experimental.pallas.ops.tpu.splash_attention import splash_attention_mask
+  from jax.experimental.pallas.ops.tpu.splash_attention import splash_attention_kernel
+  Quant = quantizations.AqtQuantization
 
 
 RMSNorm = normalizations.RMSNorm

@@ -25,19 +25,22 @@ from jax.sharding import Mesh
 from jax import lax
 import jax.numpy as jnp
 from jax.ad_checkpoint import checkpoint_name
-
 from flax import linen as nn
 
 from layers import attentions
 from layers import initializers
 from layers import linears
 from layers import models
-from layers import quantizations
-
-AttentionOp = attentions.AttentionOp
 
 import common_types
 
+if os.environ["HARDWARE"] == "gpu":
+  Quant = None
+else:
+  from layers import quantizations
+  Quant = quantizations.AqtQuantization
+
+AttentionOp = attentions.AttentionOp
 Array = common_types.Array
 Config = common_types.Config
 DType = common_types.DType
@@ -52,7 +55,6 @@ DenseGeneral = linears.DenseGeneral
 NdInitializer = initializers.NdInitializer
 Initializer = initializers.Initializer
 nd_dense_init = initializers.nd_dense_init
-Quant = quantizations.AqtQuantization
 
 
 #-----------------------------------------

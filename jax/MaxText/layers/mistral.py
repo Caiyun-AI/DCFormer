@@ -21,23 +21,24 @@
 import os
 from typing import Optional
 
-if os.environ["HARDWARE"] == "gpu":
-   Quant = None
-else:
-    from layers import quantizations
-    Quant = quantizations.AqtQuantization
-
-from layers import linears
-from layers import initializers
 import jax
 from jax.sharding import Mesh
 from flax import linen as nn
 import jax.numpy as jnp
+
+from layers import linears
+from layers import initializers
 from layers import attentions
 from layers import embeddings
 from layers import normalizations
 from layers import models
 import common_types
+
+if os.environ["HARDWARE"] == "gpu":
+    Quant = None
+else:
+    from layers import quantizations
+    Quant = quantizations.AqtQuantization
 
 Array = common_types.Array
 Config = common_types.Config
