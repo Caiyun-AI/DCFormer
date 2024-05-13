@@ -44,7 +44,7 @@ gcloud alpha compute tpus queued-resources create $TPU_NAME --node-id $TPU_NAME 
 ```
 *```SERVICE_ACCOUNT```*: &nbsp;it can be obtained through command &nbsp; ```gcloud iam service-accounts list```. The result is similar to: ```***@developer.gserviceaccount.com```   
 *```TPU_NAME```*:&nbsp;tpu name  
-*```TPU_TYPE```*:&nbsp;tpu type, v3-8, v3-32, v4-8, v4-32, v5p-8, v5p-32 etc. 
+*```TPU_TYPE```*:&nbsp;tpu type, v3-8, v3-32, v4-8, v4-32, v5p-8, v5p-32 etc.  
 *```PROJECT_ID```*: your project id  
 *```--preemptible/best-effort```*:&nbsp;if you don't want to create a preemption, you can remove this parameter  
 
