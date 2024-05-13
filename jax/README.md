@@ -44,7 +44,7 @@ gcloud alpha compute tpus queued-resources create $TPU_NAME --node-id $TPU_NAME 
 ```
 *```SERVICE_ACCOUNT```*: &nbsp;it can be obtained through command &nbsp; ```gcloud iam service-accounts list```. The result is similar to: ```***@developer.gserviceaccount.com```   
 *```TPU_NAME```*:&nbsp;tpu name  
-*```TPU_TYPE```*:&nbsp;tpu type, v3-8, v3-32, v4-8, v4-32, v5p-8, v5p-32 etc.  
+*```TPU_TYPE```*:&nbsp;tpu type, v3-8, v3-32, v4-8, v4-32, v5p-8, v5p-32 etc.    
 *```PROJECT_ID```*: your project id  
 *```--preemptible/best-effort```*:&nbsp;if you don't want to create a preemption, you can remove this parameter  
 
@@ -103,7 +103,7 @@ $PIP_OR_PYTHON_PATH/python MaxText/train.py MaxText/configs/$CONFIG_FILE run_nam
 
 ## Use Your Dataset
 
-You can change it to your own dataset by modifying the parameters ```dataset_path``` and ```dataset_type``` in the ```.yml``` config file (default dataset is ```pile```). In our library, only support ```c4``` and ```pile``` datasets. Other datasets may be added in the future. If need to use other self-processed or public datasets nowly, you can Add the corresponding data processing files or functions to the file input_pipeline directory. For detail, you can view function [ create_data_iterator_with_tokenizer](MaxText/input_pipeline/input_pipeline_interface.py) in ```input_pipeline_interface.py```
+You can change it to your own dataset by modifying the parameters ```dataset_path``` and ```dataset_type``` in the ```.yml``` config file (default dataset is ```pile```). In our library, only support ```c4``` and ```pile``` datasets. Other datasets may be added in the future. If need to use other self-processed or public datasets nowly, you can Add the corresponding data processing files or functions to the file input_pipeline directory. For detail, you can view function [ create_data_iterator_with_tokenizer](https://github.com/Caiyun-AI/DCFormer/blob/74e33be0a92caff3d56041d917e65569b1682dd2/jax/MaxText/input_pipeline/input_pipeline_interface.py#L252) in ```input_pipeline_interface.py```
 
 ## Tensorboard
 
