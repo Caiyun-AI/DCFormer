@@ -25,6 +25,8 @@ jax==0.4.25
 ## Getting Started
 
 #### 1. Data Preparation
+Data is handled entirely by reference to the Pythia Library, We chose [pythia_pile_idxmaps](https://huggingface.co/datasets/EleutherAI/pythia_pile_idxmaps) as the raw data, not [pythia_deduped_pile_idxmaps](https://huggingface.co/datasets/EleutherAI/pythia_deduped_pile_idxmaps). Interested can refer to its method for production. To save you time, we also open source the [tfrecord dataset](https://huggingface.co/datasets/Caiyun-AI/Pile_tfrecord/tree/main) we've processed.
+
 
 #### 2. Clone Library
 ```bash
