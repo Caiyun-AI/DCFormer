@@ -1,7 +1,7 @@
 ## Introduction
 This directory contains our jax implementation of Dcoformer. Note that our state-of-the-art results reported in the paper were obtained by training the model on a large-scale TPU cluster.
 
-In addition, the code of this library is modified based on [google/MaxText](https://github.com/google/maxtext) (thanks to google for its contribution), and most of its parameters and functions are used. At the same time, for the sake of simplicity of the code, some that are not used in our article are also removed Function. For the use of other functions, please refer to the [google/MaxText](https://github.com/google/maxtext) library
+In addition, the code of this library is modified based on [google/MaxText](https://github.com/google/maxtext) (thanks to google for its contribution), and most of its parameters and functions are used. At the same time, for the sake of simplicity of the code, some that are not used in our article are also removed. For the using of more functions, please refer to the [google/MaxText](https://github.com/google/maxtext) library
 
 ## Environment
 ```plaintext
