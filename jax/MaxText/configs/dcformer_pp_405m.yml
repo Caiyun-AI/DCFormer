@@ -118,7 +118,6 @@ record_internal_nn_metrics: 0
 
 # Output directory
 # Create a GCS bucket, e.g. my-maxtext-outputs and set this to "gs://my-maxtext-outputs/"
-# 一些模型训练信息的输出目录
 base_output_directory: ""
 
 # Jax cache directory
