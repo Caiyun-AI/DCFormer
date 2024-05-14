@@ -14,6 +14,7 @@ You need to upgrade transformers to avoid [(loading problems)](https://github.co
  
 ```
 pip install transformers>=4.40.2
+pip install torch==2.1.2
 ```
 
 
