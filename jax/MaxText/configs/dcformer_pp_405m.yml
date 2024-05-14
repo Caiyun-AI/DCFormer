@@ -178,12 +178,9 @@ num_slices: -1
 # dataset_path: {'train': "gs://common_datasets_us-east5/"} # c4
 dataset_path: ''
 vocab_size: 50256 # powers of 2 for sharding
-tokenizer_path: "assets/tokenizer.llama2"
-dataset_name: 'c4/en:3.0.1'
-eval_dataset_name: 'c4/en:3.0.1'
 eval_split: 'val_with_eos'
 max_corpus_chars: 10_000_000
-dataset_type: pile # must be c4 or synthetic
+dataset_type: pile
 
 # Setting for grain
 grain_worker_count: 4
