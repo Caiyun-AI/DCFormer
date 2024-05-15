@@ -2,7 +2,7 @@
 
 This folder contains pytorch implementations of DCPythia and DCFormer. We release model checkpoints of [(DCFormer-2.8B)](https://huggingface.co/Caiyun-AI/DCFormer-2.8B) and [(DCPythia-6.9B)](https://huggingface.co/Caiyun-AI/DCPythia-6.9B) on Huggingface🤗.
 Both DCFormer-2.8B and DCPythia-6.9B are pretrained on the Pile with 300B tokens. We proposed DCMHA, a parameter and computation efficient attention architecture that tackles the shortcomings of MHA
-and increases the expressive power of the model by dynamically composing attention heads. Please see downstrem evaluations and more details in the paper[(Improving Transformers with Dynamically Composable Multi-Head Attention)](). For training DCFormer efficiently, we provide Jax code in the [(jax folder)](https://github.com/Caiyun-AI/DCFormer/tree/main/jax).
+and increases the expressive power of the model by dynamically composing attention heads. Please see downstrem evaluations and more details in the paper[(Improving Transformers with Dynamically Composable Multi-Head Attention)](https://arxiv.org/abs/2405.08553). For training DCFormer efficiently, we provide Jax code in the [(jax folder)](https://github.com/Caiyun-AI/DCFormer/tree/main/jax).
 
 We recommend <strong>compiled version</strong> of DCFormer with *torch.compile* for inference acceleration. Please refer to Generation section for compile implementation.
 
