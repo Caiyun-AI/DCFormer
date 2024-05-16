@@ -99,6 +99,7 @@ PIP_OR_PYTHON_PATH=/home/xxx/miniconda3/bin
 WORKDIR=/home/xxx/projects/DcFormer/jax
 CONFIG_FILE=dcformer_pp_405m.yml
 RUN_NAME=$WORKDIR/output/
+export HARDWARE=gpu
 $PIP_OR_PYTHON_PATH/python MaxText/train.py MaxText/configs/$CONFIG_FILE run_name=$RUN_NAME hardware=gpu  compile_topology_num_slices=1 | tee train.log
 ```
 
