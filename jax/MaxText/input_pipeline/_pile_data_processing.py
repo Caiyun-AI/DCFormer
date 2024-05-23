@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from absl import logging
+import max_logging
 import tensorflow as tf
 import jax
 from jax import numpy as jnp
@@ -66,15 +67,11 @@ class PileDatasets():
                 )
             self.step_in_file = self.meta_dict.get('step_in_file')  # XD fix
 
-        if self.num_batches_to_skip is not None:
-            self.step_in_file = self.num_batches_to_skip
-
-        logging.info(f'meta_dict: {self.meta_dict}')
+        max_logging.log(f'meta_dict: {self.meta_dict}')
         self.seed = self.meta_dict['seed']
         self.dataset = self.load_tfrecord_dataset(fnames=self.path)
         self._peek = None
         self._state_before_peek = None
-
 
     def init_meta(self):
         self.meta_dict = {
@@ -116,7 +113,6 @@ class PileDatasets():
         )
 
     def get_global_batch_size(self, train_input):
-        # logging.info(f"train_input: {train_input} type: {type(train_input)}")
         return self.batch_size * self.num_infeed_hosts
 
     def _parse_function(self, example_proto):
@@ -128,19 +124,6 @@ class PileDatasets():
                 t = tf.cast(t, dtype=tf.int32)
             example[name] = tf.sparse.to_dense(t, default_value=0)[ :self.seq_len]
         return example
-
-
-#                        data['inputs'],
-#                        data['inputs_position'],
-#                        decoder_segment_ids=data['inputs_segmentation'],
-                       
-#                        enable_dropout=config.enable_dropout if is_train else False,
-#                        rngs={'dropout': rng1, 'params': aqt_rng}, mutable='intermediates')
-#   one_hot_targets = jax.nn.one_hot(data['targets'], config.vocab_size)
-#   xent, _ = max_utils.cross_entropy_with_logits(logits, one_hot_targets, 0.0)
-#   xent = nn.with_logical_constraint(xent, ('activation_batch', 'activation_length'))
-#   # Mask out paddings at the end of each example.
-#   xent = xent * (data['targets_segmentation'] != 0)
 
     def convert(self, data):
         seq_len = self.seq_len
@@ -163,7 +146,6 @@ class PileDatasets():
         process_index = jax.process_index()
         # 在这里进行shard的话，不同的pod在相同的batch_size时，拿到的数据不一致
         ds = ds.shard(self.num_infeed_hosts, process_index)
-        # logging.info(f"num_infeed_hosts: {self.num_infeed_hosts} || process_index: {process_index}")  # XD fix
         ds = ds.map(self._parse_function, num_parallel_calls=tf.data.AUTOTUNE)
         if self.shuffle_buffer_size is not None:
             ds = ds.shuffle(buffer_size=self.shuffle_buffer_size)
@@ -180,7 +162,7 @@ class PileDatasets():
         ds = ds.map(self.convert)
         ds = ds.prefetch(tf.data.AUTOTUNE)
         if self.step_in_file: ds = ds.skip(self.step_in_file)  # XD fix
-
+        # local data to global data
         ds = multihost_dataloading.MultiHostDataLoadIterator(ds, self.mesh)
 
         return ds
@@ -191,16 +173,16 @@ class PileDatasets():
         repeat_fnames = fnames * self.repeat
         N = math.ceil(len(repeat_fnames) / self.iter_file_nums)
         file_in_data = self.meta_dict["file_in_data"]
-        logging.info(f'file_in_data: {file_in_data} N: {N}')
+        max_logging.log(f'file_in_data: {file_in_data} N: {N}')
         for n in range(file_in_data, N, 1):
             fname = repeat_fnames[n * self.iter_file_nums : (n + 1) * self.iter_file_nums]
             self.meta_dict["cur_files"] = fname
             ds = self._load_file_dataset(fname)
             # ds = ds.as_numpy_iterator()
             for batch in ds:
-                # self.meta_dict["step_in_file"] += 1  # XD fix
+                self.meta_dict["step_in_file"] += 1
                 self.step_in_file += 1
                 yield batch
             self.meta_dict["file_in_data"] += 1
-            # self.meta_dict["step_in_file"] = 0  # XD fix
+            self.meta_dict["step_in_file"] = 0
             self.step_in_file = 0

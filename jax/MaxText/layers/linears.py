@@ -111,15 +111,12 @@ class DenseGeneral(nn.Module):
         # AqtDotGeneral
         dot_general_cls = self.quant.dot_general_cls()
         dot_general = dot_general_cls()
-      logging.info(f'dot_general: {dot_general}')
       return dot_general(
         inputs, kernel, ((axis, contract_ind), ((), ())), precision=None)
     # (head_nums, head_dim)
     features = _canonicalize_tuple(self.features)
     axis = _canonicalize_tuple(self.axis) # -1 -> (-1, )
     # bf16
-    logging.info(f'inputs: {inputs.shape} dtype: {self.dtype}')
-    
     inputs = jnp.asarray(inputs, self.dtype)
     # bsz * length * head_nums * head_dim
     axis = _normalize_axes(axis, inputs.ndim) # (-1, ) -> (3, )

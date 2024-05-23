@@ -41,13 +41,19 @@ def create_orbax_checkpoint_manager(
   p = epath.Path(checkpoint_dir)
 
   if dataset_type=='c4-array_record':
-    item_names = ('default', 'iter')
+    item_names = ('state', 'iter')
   else:
-    item_names = ('default',)
+    item_names = ('state',)
+
+  items = {
+        "state": orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler(use_ocdbt=False)), # lsp
+        # "step": orbax.checkpoint.Checkpointer(orbax.checkpoint.ArrayCheckpointHandler()),
+    }
 
   mngr = CheckpointManager(
       p,
-      item_names = item_names,
+      items,
+      # item_names = item_names,
       options = CheckpointManagerOptions(
           create=True,
           save_interval_steps=save_interval_steps,
@@ -59,11 +65,9 @@ def create_orbax_checkpoint_manager(
 
 
 def load_state_if_possible(checkpoint_manager: CheckpointManager,
+                           config,
                            data_iterator: Union[MultiHostDataLoadIterator, None],
-                           load_parameters_from_path: str,
-                           load_full_state_from_path: str,
-                           abstract_unboxed_pre_state: train_state.TrainState,
-                           dataset_type: Optional[str] = 'c4'):
+                           abstract_unboxed_pre_state: train_state.TrainState):
   """Loads TrainState as possible from the inputs.
 
   Args:
@@ -85,43 +89,34 @@ def load_state_if_possible(checkpoint_manager: CheckpointManager,
      At most one will be non-None. Both can be None if neither checkpoint is
      set.
   """
+  job_dir = epath.Path(config.checkpoint_dir)
+  meta_dict = data_iterator.meta_dict
+  checkpoint_step = meta_dict.get('checkpoint_step', None)
 
-  if checkpoint_manager is not None:
-    max_logging.log("checkpoint manager exists so trying to load this run's existing checkpoint")
+  if config.load_full_state_from_path:
+    checkpoint_dir = epath.Path(config.load_full_state_from_path)
+    max_logging.log(f"restoring full state from {config.load_full_state_from_path=}")
+    ckptr = orbax.checkpoint.StandardCheckpointer()
+    restored = ckptr.restore(checkpoint_dir, args=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state))
+    return  {'state': restored}, None
 
-    latest_step = checkpoint_manager.latest_step()
-    if latest_step is not None:
-      max_logging.log(f"restoring from this run's directory latest step \
-          {latest_step}")
-      if dataset_type == 'c4-array_record' and data_iterator is not None:
-        return checkpoint_manager.restore(latest_step,
-                                      args=orbax.checkpoint.args.Composite(
-                                      default=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state),
-                                      iter=grain.PyGrainCheckpointRestore(data_iterator.local_iterator)
-                                    )), None
-      else:
-        return checkpoint_manager.restore(latest_step,
-                                      args=orbax.checkpoint.args.Composite(
-                                      default=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state),
-                                    )), None
-
-  if load_parameters_from_path != "":
-    max_logging.log(f"restoring params from {load_parameters_from_path=}")
-    p = epath.Path(load_parameters_from_path)
+  elif config.load_parameters_from_path:
+    checkpoint_dir = epath.Path(config.load_parameters_from_path)
+    max_logging.log(f"restoring params from {config.load_parameters_from_path=}")
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     restore_args = orbax.checkpoint.checkpoint_utils.construct_restore_args(abstract_unboxed_pre_state.params)
-    restored = ckptr.restore(p, item = {'params': abstract_unboxed_pre_state.params}, transforms={},
-                             restore_args = {'params': restore_args})
-
+    restored = ckptr.restore(checkpoint_dir, item = {'params': abstract_unboxed_pre_state.params}, transforms={},
+                            restore_args = {'params': restore_args})
     return None, restored['params']
 
-  elif load_full_state_from_path != "":
-    max_logging.log(f"restoring full state from {load_full_state_from_path=}")
-    p = epath.Path(load_full_state_from_path)
+  elif checkpoint_step is not None:
+    max_logging.log(f"restoring params from ’{job_dir}‘ checkpoint_step: {checkpoint_step}")
+    checkpoint_dir = job_dir / str(checkpoint_step) / 'state'
+    max_logging.log(f"restoring full state from {config.load_full_state_from_path=}")
     ckptr = orbax.checkpoint.StandardCheckpointer()
-    restored = ckptr.restore(p, args=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state))
-    return  {'default': restored}, None
-
+    restored = ckptr.restore(checkpoint_dir, args=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state))
+    return  {'state': restored}, None
+    
   else:
     max_logging.log("No existing checkpoints found, not restoring checkpoint.")
     return None, None

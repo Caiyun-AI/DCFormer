@@ -395,17 +395,12 @@ def setup_initial_state(model, data_iterator, tx, config, rng, mesh, checkpoint_
 
   # Initialization
   with nn_partitioning.axis_rules(config.logical_axis_rules):
-    restored, raw_params = checkpointing.load_state_if_possible(checkpoint_manager,
-                                                data_iterator,
-                                                config.load_parameters_path,
-                                                config.load_full_state_path,
-                                                unboxed_abstract_state,
-                                                config.dataset_type)
+    restored, raw_params = checkpointing.load_state_if_possible(checkpoint_manager, config, data_iterator, unboxed_abstract_state)
 
     if restored:
       if 'iter' in restored and restored['iter'] is not None:
         data_iterator.local_iterator = restored['iter']
-      state = restored['default']
+      state = restored['state']
     else:
       init_state_partial = functools.partial(init_initial_state, model, tx, config, is_training)
       state = jax.jit(
@@ -547,17 +542,12 @@ cross_entropy_with_logits.defvjp(_cross_entropy_with_logits_fwd,
 def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
   """ Get a shaped abstraction of the state (including optimizer)"""
   init_state_partial = functools.partial(init_initial_state, model, tx, config, is_training)
-  # 获取每个参数的shape dtype
-  abstract_state = jax.eval_shape(init_state_partial, rng)
-  # jax.sharding.PartitionSpec
-  state_logical_annotations = nn.get_partition_spec(abstract_state)
-  
-  state_mesh_shardings = nn.logical_to_mesh_sharding(state_logical_annotations, mesh,
-                                                     config.logical_axis_rules)
 
-  print(f'abstract_state: {abstract_state}')
-  print(f'state_logical_annotations: {state_logical_annotations}')
-  print(f'state_mesh_shardings: {state_mesh_shardings}')
+  abstract_state = jax.eval_shape(init_state_partial, rng)
+
+  state_logical_annotations = nn.get_partition_spec(abstract_state) # to PartitionSpec
+
+  state_mesh_shardings = nn.logical_to_mesh_sharding(state_logical_annotations, mesh, config.logical_axis_rules)
 
   abstract_sharded_state = jax.jit(
       init_state_partial,
@@ -569,6 +559,7 @@ def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
   # Initialization
   with mesh, nn_partitioning.axis_rules(config.logical_axis_rules):
     state_mesh_annotations = nn.logical_to_mesh(state_logical_annotations)
+
   return unboxed_abstract_sharded_state, state_mesh_annotations, state_mesh_shardings
 
 def get_kv_cache_annotations(model, config, rng, mesh):

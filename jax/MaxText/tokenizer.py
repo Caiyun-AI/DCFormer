@@ -19,7 +19,6 @@
 from typing import Any, Dict, Iterable
 
 import dataclasses
-from absl import logging
 import tensorflow as tf
 import tensorflow_text as tftxt
 
@@ -48,7 +47,7 @@ def load_tokenizer(tokenizer_path: str, add_bos=False, add_eos=True):
     sp_tokenizer = _load_sentencepiece_tokenizer(tokenizer_path, add_bos, add_eos)
     return sp_tokenizer
   except (tf.errors.NotFoundError, tf.errors.InvalidArgumentError):
-    logging.info('SentencePiece vocab not found, Run train_tokenizer.py')
+    max_logging.log('SentencePiece vocab not found, Run train_tokenizer.py')
     return None
 
 
