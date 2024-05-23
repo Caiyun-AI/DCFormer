@@ -395,24 +395,20 @@ def setup_initial_state(model, data_iterator, tx, config, rng, mesh, checkpoint_
 
   # Initialization
   with nn_partitioning.axis_rules(config.logical_axis_rules):
-    restored, raw_params = checkpointing.load_state_if_possible(checkpoint_manager,
-                                                data_iterator,
-                                                config.load_parameters_path,
-                                                config.load_full_state_path,
-                                                unboxed_abstract_state,
-                                                config.dataset_type)
+    restored, raw_params = checkpointing.load_state_if_possible(checkpoint_manager, config, data_iterator, unboxed_abstract_state)
 
     if restored:
       if 'iter' in restored and restored['iter'] is not None:
         data_iterator.local_iterator = restored['iter']
-      state = restored['default']
+      state = restored['state']
     else:
       init_state_partial = functools.partial(init_initial_state, model, tx, config, is_training)
       state = jax.jit(
           init_state_partial,
           in_shardings=None,
           out_shardings=state_mesh_shardings
-      )(rng)
+      )(rng)  # 没有eval shape就会返回真实的初始化参数，不然只返回shape dtype
+      # print(f'state: {state}')
       if raw_params: # If we loaded a partial state, we need to merge it.
         state = state.replace(params = raw_params)
 
@@ -547,28 +543,42 @@ cross_entropy_with_logits.defvjp(_cross_entropy_with_logits_fwd,
 def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
   """ Get a shaped abstraction of the state (including optimizer)"""
   init_state_partial = functools.partial(init_initial_state, model, tx, config, is_training)
-  # 获取每个参数的shape dtype
-  abstract_state = jax.eval_shape(init_state_partial, rng)
-  # jax.sharding.PartitionSpec
-  state_logical_annotations = nn.get_partition_spec(abstract_state)
-  
-  state_mesh_shardings = nn.logical_to_mesh_sharding(state_logical_annotations, mesh,
-                                                     config.logical_axis_rules)
+
+  # 获取每个参数的shape dtype 还有参数的shard规则的，在这里，shard 规则显示在names里面:类似于：{'wi_0': {'kernel': LogicallyPartitioned(value=ShapeDtypeStruct(shape=(1024, 12, 2816), dtype=float32), names=('embed', 'layers', 'mlp'), mesh=None, rules=None)},
+  # val_shape: Compute the shape/dtype of fun without any FLOPs.
+  abstract_state = jax.eval_shape(init_state_partial, rng) # eval_shape的目的是获取返回值的shape，dtype和输出shard，但是因为没有传入out_shardings方式，因此输出mesh为None
+
+  # 基于abstract_state中的names（shard规则，将抽取出来，并初始化为PartitionSpec对象） 类似{'wi_0': {'kernel': PartitionSpec('embed', 'layers', 'mlp')}
+  state_logical_annotations = nn.get_partition_spec(abstract_state) # to PartitionSpec
+
+  # 基于PartitionSpec对象转化为NamedSharding对象，按照logical_axis_rules的第2列进行shard，类似{'wi_0': {'kernel': NamedSharding(mesh=Mesh('data': 1, 'fsdp': 8, 'fsdp_transpose': 1, 'sequence': 1, 'tensor': 1, 'autoregressive': 1)    to NamedSharding
+  state_mesh_shardings = nn.logical_to_mesh_sharding(state_logical_annotations, mesh, config.logical_axis_rules)
 
   print(f'abstract_state: {abstract_state}')
   print(f'state_logical_annotations: {state_logical_annotations}')
   print(f'state_mesh_shardings: {state_mesh_shardings}')
 
+  # 带有shard信息的abstract_state
   abstract_sharded_state = jax.jit(
       init_state_partial,
       in_shardings=None,
-      out_shardings=state_mesh_shardings
+      out_shardings=state_mesh_shardings # 给每个参数分配NamedSharding(mesh=Mesh('data': 1, '....
   ).eval_shape(rng)
 
+  print(f'abstract_sharded_state: {abstract_sharded_state}')
+
+  #  LogicallyPartitioned(value=ShapeDtypeStruct(shape=(1024,), dtype=bfloat16, sharding...) 去掉logicallypartioned  -> ShapeDtypeStruct(....)
+  # 应该是只取对象的value值
   unboxed_abstract_sharded_state = unbox_logicallypartioned(abstract_sharded_state)
   # Initialization
   with mesh, nn_partitioning.axis_rules(config.logical_axis_rules):
+    # state to 人工标注的shard，对应yml配置文件中的logical_axis_rules第2列
+    # 类似'wi_0': {'kernel': PartitionSpec(('fsdp', 'sequence'), None, ('fsdp_transpose', 'tensor', 'autoregressive'))}
     state_mesh_annotations = nn.logical_to_mesh(state_logical_annotations)
+
+  # print(f'state_mesh_annotations: {state_mesh_annotations}')
+  # print(f'unboxed_abstract_sharded_state: {unboxed_abstract_sharded_state}')
+
   return unboxed_abstract_sharded_state, state_mesh_annotations, state_mesh_shardings
 
 def get_kv_cache_annotations(model, config, rng, mesh):

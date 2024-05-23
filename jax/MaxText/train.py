@@ -42,7 +42,7 @@ import max_logging
 import optimizers
 import pyconfig
 
-from input_pipeline.input_pipeline_interface import create_data_iterator_with_tokenizer
+from input_pipeline.input_pipeline_interface import create_data_iterator_with_tokenizer, record_file_and_step
 from layers import models
 
 import jax.numpy as jnp
@@ -55,17 +55,17 @@ from cloud_tpu_diagnostics import diagnostic
 from cloud_tpu_diagnostics.configuration import debug_configuration
 from cloud_tpu_diagnostics.configuration import diagnostic_configuration
 from cloud_tpu_diagnostics.configuration import stack_trace_configuration
-
+from etils import epath
 
 if os.environ["HARDWARE"] != "gpu":
   from layers import quantizations
 
 from absl import logging
+from flax import struct as flax_struct
 
 
 Transformer = models.Transformer
 EPS = 1e-8
-
 
 
 def validate_train_config(config):
@@ -172,12 +172,15 @@ def save_checkpoint(checkpoint_manager, step, state, dataset_type='c4', data_ite
   """Wrapper for saving checkpoint"""
   if dataset_type == 'c4-array_record':
     return checkpoint_manager.save(step, args=orbax.checkpoint.args.Composite(
-                                                    default=orbax.checkpoint.args.StandardSave(state),
+                                                    state=orbax.checkpoint.args.StandardSave(state),
                                                     iter=grain.PyGrainCheckpointSave(data_iterator.local_iterator)
                                                     ))
   else:
-    return checkpoint_manager.save(step, args=orbax.checkpoint.args.Composite(
-                                                    default=orbax.checkpoint.args.StandardSave(state)))
+    # __import__('ipdb').set_trace()
+    # stard_save_state = orbax.checkpoint.args.StandardSave(state)
+    # args_state = orbax.checkpoint.args.Composite(state=stard_save_state)
+    state_dict = {'state': state}
+    return checkpoint_manager.save(step, state_dict)
 # -----------------------------------------------------------------------------
 # Top-level Functions
 # -----------------------------------------------------------------------------
@@ -226,7 +229,6 @@ def loss_fn(model, config, data, dropout_rng, params, is_train=True):
                        data['inputs'],
                        data['inputs_position'],
                        decoder_segment_ids=data['inputs_segmentation'],
-                       
                        enable_dropout=config.enable_dropout if is_train else False,
                        rngs={'dropout': rng1, 'params': aqt_rng}, mutable='intermediates')
   one_hot_targets = jax.nn.one_hot(data['targets'], config.vocab_size)
@@ -269,6 +271,7 @@ def train_step(model, config, state, data, dropout_rng):
     grads, _ = optax.clip_by_global_norm(config.gradient_clipping_threshold).update(raw_grads, state, None)
   else:
     grads = raw_grads
+  # https://github.com/google/flax/blob/main/flax/training/train_state.py
   new_state = state.apply_gradients(grads=grads)
   metrics = {'scalar': {'learning/loss': loss, 'learning/grad_norm': max_utils.l2norm_pytree(grads),
              'learning/raw_grad_norm': max_utils.l2norm_pytree(raw_grads),
@@ -364,6 +367,9 @@ def setup_train_loop(config):
           mesh, learning_rate_schedule, data_iterator, eval_data_iterator, state)
 
 
+from flax.training import train_state
+
+
 def train_loop(config, state=None):
   """Main Training loop.
   Args:
@@ -399,7 +405,15 @@ def train_loop(config, state=None):
       model,
       config
     )
+  if isinstance(state, dict):
+    state = train_state.TrainState(
+      step=state['step'],
+      params=state['params'],
+      opt_state=state['opt_state'],
+      apply_fn=model.apply,
+      tx=None,
 
+    )
   num_model_parameters = max_utils.calculate_num_params_from_pytree(state.params)
   max_logging.log(f"number parameters: {num_model_parameters/10**9:.5f} billion")
   per_device_tflops = calculate_training_tflops(num_model_parameters, config)
@@ -445,9 +459,11 @@ def train_loop(config, state=None):
 
   eval_loop_num_batches = 0
   for step in np.arange(start_step, config.steps):
+    print(f'step: {step}')
+    print(f'step in file: {data_iterator.meta_dict["step_in_file"]}')
     if step == first_profiling_step:
       max_utils.activate_profiler(config)
-
+    
     example_batch = load_next_batch(data_iterator, example_batch, config)
     nextrng = jax.jit(jax.random.fold_in)(init_rng, step)
     with mesh, nn_partitioning.axis_rules(config.logical_axis_rules):
@@ -460,8 +476,11 @@ def train_loop(config, state=None):
     last_step_completion = new_time
 
     if checkpoint_manager is not None:
-      if save_checkpoint(checkpoint_manager, step, state, config.dataset_type, data_iterator):
-        max_logging.log(f"saved a checkpoint at step {step}")
+      save_or_pass = save_checkpoint(checkpoint_manager, step, state, config.dataset_type, data_iterator)
+      # save_or_pass = 1
+      if save_or_pass:
+        record_file_and_step(step, config, data_iterator)
+        max_logging.log(f"saved a checkpoint at step {step} state step: {state.step}")
 
       # Upon preemption, exit when and only when all ongoing saves are complete.
       if checkpoint_manager.reached_preemption(step):

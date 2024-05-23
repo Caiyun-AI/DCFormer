@@ -22,11 +22,11 @@ from typing import Tuple
 
 from absl import app
 from absl import flags
-from absl import logging
 import jax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import max_logging
 from sentencepiece import SentencePieceTrainer
 
 _DATASET_PATH = flags.DEFINE_string(
@@ -118,7 +118,7 @@ def _train_sentencepiece(dataset: tf.data.Dataset,
       tf.io.gfile.makedirs(abs_assets_path)
     tf.io.gfile.copy(model_fp.name + '.model', copy_rename_path, overwrite=True)
     tf.io.gfile.rename(copy_rename_path, abs_model_path, overwrite=True)
-    logging.info('copied %s to %s', model_fp.name + '.model', abs_model_path)
+    max_logging.log('copied %s to %s', model_fp.name + '.model', abs_model_path)
   else:
     while not tf.io.gfile.exists(abs_model_path):
       time.sleep(1)
@@ -133,7 +133,7 @@ def train_tokenizer(dataset: tf.data.Dataset,
                       max_corpus_chars: int,
                       data_keys: Tuple[str] = ('text',)):
   """tokenizer training function"""
-  logging.info('SentencePiece vocab not found, building one from data.')
+  max_logging.log('SentencePiece vocab not found, building one from data.')
   vocab_path = _train_sentencepiece(
       dataset,
       vocab_size=vocab_size,
@@ -141,7 +141,7 @@ def train_tokenizer(dataset: tf.data.Dataset,
       assets_path=assets_path,
       model_path=vocab_path,
       data_keys=data_keys)
-  logging.info('Model saved at %s', vocab_path)
+  max_logging.log('Model saved at %s', vocab_path)
 
 
 def main(argv):
