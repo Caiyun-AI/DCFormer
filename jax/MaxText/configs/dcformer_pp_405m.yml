@@ -90,6 +90,9 @@ eval_per_device_batch_size: 16.0 # eval also use per_device_batch_size
 eval_loop_num_batches: 648
 eval_interval: 13500  # the specific number of train step between eval_step
 qk_norm: True # 405m use true, but 2b8 model use false
+only_eval: False
+load_full_state_from_path: ''
+load_parameters_from_path: ''
 
 pre_compose: True # pax: PROJECT_LOGITS
 post_compose: True # pax: PROJECT_PROBS
