@@ -545,7 +545,7 @@ def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
   init_state_partial = functools.partial(init_initial_state, model, tx, config, is_training)
 
   # 获取每个参数的shape dtype 还有参数的shard规则的，在这里，shard 规则显示在names里面:类似于：{'wi_0': {'kernel': LogicallyPartitioned(value=ShapeDtypeStruct(shape=(1024, 12, 2816), dtype=float32), names=('embed', 'layers', 'mlp'), mesh=None, rules=None)},
-  # val_shape: Compute the shape/dtype of fun without any FLOPs.
+  # eval_shape: Compute the shape/dtype of fun without any FLOPs.
   abstract_state = jax.eval_shape(init_state_partial, rng) # eval_shape的目的是获取返回值的shape，dtype和输出shard，但是因为没有传入out_shardings方式，因此输出mesh为None
 
   # 基于abstract_state中的names（shard规则，将抽取出来，并初始化为PartitionSpec对象） 类似{'wi_0': {'kernel': PartitionSpec('embed', 'layers', 'mlp')}
@@ -554,9 +554,9 @@ def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
   # 基于PartitionSpec对象转化为NamedSharding对象，按照logical_axis_rules的第2列进行shard，类似{'wi_0': {'kernel': NamedSharding(mesh=Mesh('data': 1, 'fsdp': 8, 'fsdp_transpose': 1, 'sequence': 1, 'tensor': 1, 'autoregressive': 1)    to NamedSharding
   state_mesh_shardings = nn.logical_to_mesh_sharding(state_logical_annotations, mesh, config.logical_axis_rules)
 
-  print(f'abstract_state: {abstract_state}')
-  print(f'state_logical_annotations: {state_logical_annotations}')
-  print(f'state_mesh_shardings: {state_mesh_shardings}')
+  # print(f'abstract_state: {abstract_state}')
+  # print(f'state_logical_annotations: {state_logical_annotations}')
+  # print(f'state_mesh_shardings: {state_mesh_shardings}')
 
   # 带有shard信息的abstract_state
   abstract_sharded_state = jax.jit(
@@ -565,7 +565,7 @@ def get_abstract_state(model, tx, config, rng, mesh, is_training=True):
       out_shardings=state_mesh_shardings # 给每个参数分配NamedSharding(mesh=Mesh('data': 1, '....
   ).eval_shape(rng)
 
-  print(f'abstract_sharded_state: {abstract_sharded_state}')
+  # print(f'abstract_sharded_state: {abstract_sharded_state}')
 
   #  LogicallyPartitioned(value=ShapeDtypeStruct(shape=(1024,), dtype=bfloat16, sharding...) 去掉logicallypartioned  -> ShapeDtypeStruct(....)
   # 应该是只取对象的value值
