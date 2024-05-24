@@ -133,7 +133,7 @@ class DcformerDecoderLayer(nn.Module):
 
     # Fully Connected
     hidden_states = models.RMSNorm(
-        dtype=cfg.dtype, name=f'post_self_attention_layer_norm_{block_index}', kernel_axes=('embed',),
+        dtype=cfg.dtype, name=f'sub.{block_index}.post_self_attention_layer_norm', kernel_axes=('embed',),
         epsilon=cfg.normalization_layer_epsilon,
         )(intermediate_inputs)
     hidden_states = nn.with_logical_constraint(hidden_states, ('activation_batch', 'activation_length', 'activation_embed'))
@@ -144,7 +144,7 @@ class DcformerDecoderLayer(nn.Module):
         activations=cfg.mlp_activations,
         intermediate_dropout_rate=cfg.dropout_rate,
         dtype=cfg.dtype,
-        name=f'mlp_{block_index}',
+        name=f'sub.{block_index}.mlp',
         config=cfg,
         quant=self.quant,
         kernel_init=NormalInitializer(0.006),
