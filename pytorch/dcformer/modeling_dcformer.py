@@ -123,7 +123,7 @@ class DCFormer(PreTrainedModel):
     def generate(self, input_ids, num_tokens_to_generate=10, compiled_decode_one_token=None):
         batch_size, seq_length = input_ids.shape
         input_pos = torch.arange(seq_length, device=self.device)
-        generated_ids = torch.zeros(batch_size, seq_length + num_tokens_to_generate + 1, dtype=torch.int, device=self.device)
+        generated_ids = torch.zeros(batch_size, seq_length + num_tokens_to_generate, dtype=torch.int, device=self.device)
         generated_ids[:, :seq_length] = input_ids.to(self.device).to(torch.int)
         logits = self.forward(input_ids, input_pos=input_pos,return_tensor=True)
         _next_token = torch.argmax(logits[:, -1], dim=-1)[:, None]
@@ -162,12 +162,14 @@ class DCFormer(PreTrainedModel):
         for i, layer in enumerate(self.layers):
             if self.is_training or self.window_size is None :
                 layer_mask = mask
+                gen_mask = None
             elif self.window_size is not None: 
                 layer_mask = mask[:,:,1] if layer.attention.window_size is None else mask[:,:,0]
+                gen_mask = mask[:,:,1] if layer.attention.window_size is not None else None 
             if self.use_gradient_checkpointing:
                 x = checkpoint(layer, x, input_pos, freqs_cis, layer_mask)
             else:
-                x = layer(x, input_pos, freqs_cis, layer_mask)
+                x = layer(x, input_pos, freqs_cis, layer_mask, gen_mask=gen_mask)
         x = self.norm(x)
         logits = self.output(x)
         if return_tensor:
@@ -185,8 +187,8 @@ class DCFormerBlock(nn.Module):
         self.ffn_norm = RMSNorm(config.dim, config.norm_eps)
         self.attention_norm = RMSNorm(config.dim, config.norm_eps)
 
-    def forward(self, x: Tensor, input_pos: Tensor, freqs_cis: Tensor, mask: Tensor) -> Tensor:
-        h = x + self.attention(self.attention_norm(x), freqs_cis, mask, input_pos, fast_infer=True)
+    def forward(self, x: Tensor, input_pos: Tensor, freqs_cis: Tensor, mask: Tensor, gen_mask=None) -> Tensor:
+        h = x + self.attention(self.attention_norm(x), freqs_cis, mask, input_pos, gen_mask=gen_mask, fast_infer=True)
         out = h + self.feed_forward(self.ffn_norm(h))
         return out
 
@@ -416,7 +418,7 @@ class DCMHAttention(nn.Module):
         y = probs @ v
         return y
 
-    def forward(self, x: Tensor, freqs_cis: Tensor, mask: Tensor, input_pos: Optional[Tensor] = None, fast_infer=True) -> Tensor:
+    def forward(self, x: Tensor, freqs_cis: Tensor, mask: Tensor, input_pos: Optional[Tensor] = None, fast_infer=True, gen_mask=None) -> Tensor:
         bsz, seqlen, _ = x.shape
 
         kv_size = self.n_local_heads * self.head_dim
@@ -483,7 +485,7 @@ class DCMHAttention(nn.Module):
                     y[:,:,start:stop] = _o
         else: # inference
             if seqlen == 1: # one-token generation
-                k_mask = mask if self.window_size is None else mask[:,:,:,:self.kv_cache.seq_length]
+                k_mask = mask if self.window_size is None else gen_mask[:, :, :,:self.kv_cache.seq_length] 
                 if fast_infer:
                     y = self._generate_fast(x, input_pos, q, k, v, k_mask)
                 else: 
