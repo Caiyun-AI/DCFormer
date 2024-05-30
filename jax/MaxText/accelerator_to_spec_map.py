@@ -31,6 +31,10 @@ class SystemCharacteristics:
   devices_per_slice: int
 
 UserFacingNameToSystemCharacteristics = {
+    # v3
+    'v3-8': SystemCharacteristics(
+        'tpu', 'v3:2x2x1', 'default', (2, 2, 1), 4
+    ),
     # v5e
     'v5e-16': SystemCharacteristics(
         'tpu', 'v5e:4x4', 'default', (2, 2, 1), 16

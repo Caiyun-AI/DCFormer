@@ -188,6 +188,7 @@ class _HyperParameters():
 
   @staticmethod
   def user_init(raw_keys):
+
     '''Transformations between the config data and configs used at runtime'''
     if raw_keys["run_name"] == "":
       raw_keys["run_name"] = os.environ.get("JOBSET_NAME") #using XPK default
@@ -224,6 +225,7 @@ class _HyperParameters():
     raw_keys["dtype"] = jax.numpy.dtype(raw_keys["dtype"])
     raw_keys["logical_axis_rules"] = _lists_to_tuples(raw_keys["logical_axis_rules"])
     raw_keys["data_sharding"] = _lists_to_tuples(raw_keys["data_sharding"])
+    
 
     validate_keys(raw_keys)
 
@@ -250,7 +252,6 @@ class _HyperParameters():
     '''
     validate_model_name(raw_keys['model_name'])
     max_logging.log(f"Running Model: {raw_keys['model_name']}")
-
     updated_keys = []
     if raw_keys['model_name'] != 'default':
       model_name = raw_keys['model_name']
@@ -303,8 +304,10 @@ def get_individual_scales(scale):
 
 def calculate_global_batch_sizes(raw_keys):
   """ Calculates target global batch size from target devices and per_device_batch"""
+
   per_device_batch_size = raw_keys['per_device_batch_size']
   num_devices = get_num_target_devices(raw_keys)
+
   if per_device_batch_size < 1.0:
     # For per_device_batch_size<1, we load the data as if per_device_batch_size=1
     global_batch_size_to_load = num_devices
@@ -312,9 +315,12 @@ def calculate_global_batch_sizes(raw_keys):
     global_batch_size_to_load = int(num_devices * per_device_batch_size)
 
   global_batch_size_to_train_on = int(num_devices * per_device_batch_size)
+  print(f'num_devices: {num_devices} global_batch_size_to_train_on: {global_batch_size_to_train_on}')
+
   return global_batch_size_to_load, global_batch_size_to_train_on
 
 def get_num_target_devices(raw_keys):
+
   compile_topology = accelerator_to_spec_map.get_system_characteristics(raw_keys.get('compile_topology', ""))
   if compile_topology is not None:
     devices_per_slice = compile_topology.devices_per_slice
