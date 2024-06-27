@@ -223,6 +223,7 @@ class DynamicWeightProjection(nn.Module):
         if self.use_sw:
             self.sw = nn.parameter.Parameter(torch.stack([self.pre_proj.w, self.post_proj.w]).squeeze(1) + torch.eye(self.num_heads) ).to(self.dw1.device) # (2,N,N) sw + identity matrix
         else:
+            # torch.eye(self.num_heads) -> N *
             self.sw = (torch.eye(self.num_heads).expand(2,self.num_heads,self.num_heads)).to(self.dw1.device) # identity matrix (2,N,N)
         
     def forward(self,query_vec,KW:Optional[torch.Tensor]=None, gen_cache:Optional[bool]=True):  
@@ -232,12 +233,14 @@ class DynamicWeightProjection(nn.Module):
         w1 = self.dw1_norm(w1) # BTGCIM
         pre_qw1, pre_kw1, post_qw1, post_kw1 = unbind(w1, 4, dim=3) # BTG4IM->[BTGIM]*4
         pre_qw2, pre_kw2, post_qw2, post_kw2 = unbind(w2, 4, dim=3) 
+        # dd = torch.einsum('BTD,DGH->BTGH', query_vec, self.dd) # BTG(4M)
         dd = torch.einsum('BTD,DGM->BTGM', query_vec, self.dd) # BTG(4M)
         dd = self.dw_activation(dd)
         pre_qdd, pre_kdd, post_qdd, post_kdd = torch.split(dd, dd.shape[-1] // 4, dim=-1) # BTG(4N)->[BTGN]*4
         pre_dw_args = (pre_qw1, pre_qw2, pre_kw1, pre_kw2, pre_qdd, pre_kdd)
         post_dw_args = (post_qw1, post_qw2, post_kw1, post_kw2, post_qdd, post_kdd)
         if gen_cache: # generate KW cache
+            #lsp tag: 'BTGIM, BTGIN->BTMN'  T is Q length, it is 1 when inference
             pre_kw = torch.einsum('BSGIM, BSGIN->BSMN', pre_kw1, pre_kw2) + torch.diag_embed(pre_kdd.squeeze(2))  # merge kw and kdd
             post_kw = torch.einsum('BSGIM, BSGIN->BSMN', post_kw1, post_kw2) + torch.diag_embed(post_kdd.squeeze(2))
             KW = torch.stack((pre_kw, post_kw), dim=-3) # BSMN,BSMN->BS2MN
@@ -488,10 +491,10 @@ class DCMHAttention(nn.Module):
                     y = self._generate_fast(x, input_pos, q, k, v, k_mask)
                 else: 
                     assert not self.query_wise
-                    # generate dw from hidden_state
+                    # generate dw from hidden_state, x shape: B * 1 * D
                     pre_proj_dw_args, post_proj_dw_args, kw_new = self.dyn_w_proj(x, gen_cache=True)
                     
-                    # update kvkw cache
+                    # update kvkw cache,  logtis * (kw_new + sw) = logits + logits * kw_new,   <=> x + residual
                     kw_new = kw_new + self.dyn_w_proj.sw # absorb residual or sw into kw cache
                     if self.kv_cache is not None:
                         k, v, kw_out = self.kv_cache.update(input_pos, k, v, kw_val=kw_new) # BNSD, BNSD, BS2NN
@@ -509,6 +512,11 @@ class DCMHAttention(nn.Module):
                     # merge post_w and apply it
                     post_qw1, post_qw2, post_kw1, post_kw2, post_qdd, post_kdd = post_proj_dw_args
                     post_qw = torch.einsum('BTGIN, BTGIM->BTNM', post_qw1, post_qw2) + torch.diag_embed(post_qdd.squeeze(2))
+                    # kdd is in kw_out 
+                    # = P * qw1 + P * qw2 + P * qdd + P * kw1 + P * kw2 + P * kdd
+                    # = P * (qw1 + qw2 + qdd) + P * (kwq + kw2 + kdd)
+                    # = P * post_qw + P * kw_out
+                    # = P * (post_qw + kw_out)
                     post_w = post_qw + kw_out[:,:,1]
                     probs = self.dyn_w_proj.post_proj(probs, proj_w=post_w.squeeze(1)) 
 

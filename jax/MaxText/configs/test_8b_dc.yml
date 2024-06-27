@@ -70,13 +70,13 @@ global_parameter_scale: 1
 base_emb_dim: 4096
 base_num_query_heads: 32
 base_num_kv_heads: 32
-base_mlp_dim: 5632
+base_mlp_dim: 5504
 base_num_decoder_layers: 48
 # lsp pax
-window_size: [256, null, 256, 256] # null or list. ex: [256, null]
+window_size: [256, 16384, 256, 3256] # null or list. ex: [256, null]
 num_layers_per_block: 4 # it must equal to widow_size list length, ex: window_size = [256, null], num_layers_per_block = 2
 query_chunk_size: 512 # null or int.
-max_target_length: 4097 # Maximum sequence length
+max_target_length: 16385 # Maximum sequence length
 reset_for_eval: True # True will rest eval dataset
 epoch: 1
 train_shuffle_buffer_size: null # null or int
@@ -84,15 +84,12 @@ eval_shuffle_buffer_size: null # null or int
 training_num_batches_to_skip: null # skip data , null or int
 zero_loss: True # whether to compute id zero loss when train
 iter_file_nums: 2 # how many files every file batch
-static_proj: True # default false
-per_device_batch_size: 8
-eval_per_device_batch_size: 8 # eval also use per_device_batch_size
-eval_loop_num_batches: 82
-eval_interval: 10000  # the specific number of train step between eval_step
+static_proj: False # default false
+per_device_batch_size: 1.0
+eval_per_device_batch_size: 1.0 # eval also use per_device_batch_size
+eval_loop_num_batches: 648
+eval_interval: 13500  # the specific number of train step between eval_step
 qk_norm: True # 405m use true, but 2b8 model use false
-only_eval: False
-load_full_state_from_path: ''
-load_parameters_from_path: ''
 
 pre_compose: True # pax: PROJECT_LOGITS
 post_compose: True # pax: PROJECT_PROBS
@@ -121,7 +118,6 @@ record_internal_nn_metrics: 0
 
 # Output directory
 # Create a GCS bucket, e.g. my-maxtext-outputs and set this to "gs://my-maxtext-outputs/"
-# 一些模型训练信息的输出目录
 base_output_directory: ""
 
 # Jax cache directory
@@ -181,12 +177,9 @@ num_slices: -1
 # dataset_path: {'train': "gs://common_datasets_us-east5/"} # c4
 dataset_path: ''
 vocab_size: 50256 # powers of 2 for sharding
-tokenizer_path: "assets/tokenizer.llama2"
-dataset_name: 'c4/en:3.0.1'
-eval_dataset_name: 'c4/en:3.0.1'
 eval_split: 'val_with_eos'
 max_corpus_chars: 10_000_000
-dataset_type: pile # must be c4 or synthetic
+dataset_type: pile
 
 # Setting for grain
 grain_worker_count: 4

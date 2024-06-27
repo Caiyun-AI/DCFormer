@@ -325,12 +325,14 @@ class CrossHeadProjection(nn.Module):
         eqn1 = f'{inputs_label},{dw_label}->{hidden_label}' # 'BGMTS,BTGMI->BGITS'
         eqn2 = f'{hidden_label},{dw_label}->{inputs_label}' # 'BGITS,BTGMI->BGMTS'
         if sym == 'T' and self.query_wise or sym == 'S' and self.key_wise:
+          # dynamic_hidden_dim: I -> 2 lsp here
           if self.loop_over_dynamic_hd and dynamic_hidden_dim <= 2:
             for i in range(dynamic_hidden_dim):
               if dw_label[-1] == hidden_sym:
                 hidden = jnp.einsum(eqn1.replace(hidden_sym, ''), inputs, w1[..., i])
                 out = jnp.einsum(eqn2.replace(hidden_sym, ''), hidden, w2[..., i])
               else:
+                # lsp
                 assert dw_label[-2] == hidden_sym, dw_label
                 hidden = jnp.einsum(eqn1.replace(hidden_sym, ''), inputs, w1[..., i, :])
                 out = jnp.einsum(eqn2.replace(hidden_sym, ''), hidden, w2[..., i, :])

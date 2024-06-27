@@ -38,7 +38,7 @@ from google.cloud import storage
 
 import max_logging
 from etils import epath
-
+import random
 
 SKIP_STEP_NAME = 'skip_file_and_step.json'
 
@@ -166,6 +166,37 @@ def extract_pythia_datapath(dataset_path, eval_split):
     return pathes, eval_pathes
 
 
+def extract_v3p5_longdata_files(dataset_path, eval_split=None):
+    # random.seed(9876)
+    client = storage.Client()
+    #v3: us-east1-d -> common_datasets, v4: us-central2-b -> common_datasets_us-central2-b
+    path = dataset_path.replace('gs://', '')
+    path_parts = path.split('/')
+    bucket_name = path_parts[0]
+    directory_path = '/'.join(path_parts[1:])
+    directory_path = directory_path if directory_path.endswith('/') else directory_path + '/'
+    train_files, valid_files = [], []
+    train_long_files, train_short_files = [], []
+    for blob in client.list_blobs(bucket_name, prefix=directory_path):
+        path = f'gs://{os.path.join(bucket_name, blob.name)}'
+        if 'valid' in path:
+            valid_files.append(path)
+        else:
+            if '.long' in path:
+                train_long_files.append(path)
+            else:
+                train_short_files.append(path)
+    # file size short：long = 1.5: 1, 为了保证short的token: long = 3: 7, 因此 short 取 (1 / 1.5) * (3 / 7) = 2 / 7
+    # k = len(train_short_files) // 1
+    short_k = min(3 * len(train_long_files) // 14, len(train_short_files))
+    selected_short_files = random.sample(train_short_files, k=short_k)
+    train_files = selected_short_files + train_long_files
+    max_logging.log(f'selected_short_files: {len(selected_short_files)} train_long_files: {len(train_long_files)}')
+    random.shuffle(train_files)
+    valid_files = sorted(valid_files)
+    return train_files, valid_files
+
+
 def extract_train_skip_step(job_log_dir, step, only_eval=False):
     if job_log_dir is None:
         return {}
@@ -198,7 +229,9 @@ def make_pile_train_iterator(config, mesh, add_bos, add_eos):
   train_name = f'{config.dataset_type}.train'
   eval_name = f'{config.dataset_type}.eval'
 
-  train_pathes, eval_pathes = extract_pythia_datapath(config.dataset_path, config.eval_split)
+  # train_pathes, eval_pathes = extract_pythia_datapath(config.dataset_path, config.eval_split)
+  train_pathes, eval_pathes = extract_v3p5_longdata_files(config.dataset_path, config.eval_split)
+
   num_local_devices = jax.local_device_count()
 
   job_dir = epath.Path(config.run_name)
