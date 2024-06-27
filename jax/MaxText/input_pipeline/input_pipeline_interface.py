@@ -333,7 +333,7 @@ def create_data_iterator_with_tokenizer(config, mesh, add_bos = True, add_eos = 
 def get_shaped_batch(config):
   """ Return the shape of the batch - this is what eval_shape would return for the
   output of create_data_iterator_with_tokenizer, but eval_shape doesn't work, see b/306901078."""
-  batch_shape = (config.global_batch_size_to_load, config.max_target_length)
+  batch_shape = (config.global_batch_size_to_load, config.max_target_length - 1)
   shaped_batch = {}
   shaped_batch['inputs'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
   shaped_batch['inputs_position'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
