@@ -87,6 +87,7 @@ class DenseGeneral(nn.Module):
   features: Union[Iterable[int], int]
   axis: Union[Iterable[int], int] = -1
   dtype: DType = jnp.float32
+  weight_dtype: DType = jnp.float32
   kernel_init: NdInitializer = nd_dense_init(1.0, 'fan_in', 'truncated_normal')
   kernel_axes: Tuple[str, ...] = ()
   quant: Optional[Quant] = None
@@ -128,7 +129,7 @@ class DenseGeneral(nn.Module):
         'kernel',
         nn.with_logical_partitioning(self.kernel_init, self.kernel_axes),
         kernel_shape,
-        jnp.float32,
+        self.weight_dtype,
         kernel_in_axis,
         kernel_out_axis,
     )
@@ -206,6 +207,7 @@ class MlpBlock(nn.Module):
     if cfg.fused_mlp:
       x = DenseGeneral(
             (len(self.activations), self.intermediate_dim),
+            weight_dtype=cfg.weight_dtype,
             dtype=self.dtype,
             kernel_init=self.kernel_init,
             kernel_axes=('embed', 'num_activations', 'mlp'),
@@ -221,6 +223,7 @@ class MlpBlock(nn.Module):
         dense_name = 'wi' if len(self.activations) == 1 else f'wi_{idx}'
         x = DenseGeneral(
             self.intermediate_dim,
+            weight_dtype=cfg.weight_dtype,
             dtype=self.dtype,
             kernel_init=self.kernel_init,
             kernel_axes=('embed', 'mlp'), # fsdp, mp
@@ -242,6 +245,7 @@ class MlpBlock(nn.Module):
     )
     output = DenseGeneral(
         inputs.shape[-1],
+        weight_dtype=cfg.weight_dtype,
         dtype=self.dtype,
         kernel_init=self.kernel_init,
         kernel_axes=('mlp', 'embed'), # mp, fsdp

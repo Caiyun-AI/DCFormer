@@ -757,6 +757,7 @@ class Attention(nn.Module):
       axis=-1,
       kernel_init=self.kernel_init, # lsp
       kernel_axes=('embed', 'heads', 'kv'), # fsdp, mdl, None
+      weight_dtype=self.config.weight_dtype,
       dtype=self.dtype,
       name='query',
       quant=self.quant)(inputs_q)
@@ -784,6 +785,7 @@ class Attention(nn.Module):
         axis=-1,
         kernel_init=self.kernel_init,
         kernel_axes=('embed', 'heads', 'kv'),
+        weight_dtype=self.config.weight_dtype,
         dtype=self.dtype,
         name=proj_name,
         quant=self.quant)(inputs_kv)
@@ -797,6 +799,7 @@ class Attention(nn.Module):
       axis = -1,
       kernel_init=self.kernel_init,
         kernel_axes=('embed', 'qkv', 'heads', 'kv'),
+        weight_dtype=self.config.weight_dtype,
         dtype=self.dtype,
         name=proj_name,
         quant=self.quant)(inputs)
@@ -809,6 +812,7 @@ class Attention(nn.Module):
       axis=(-2, -1),
       kernel_init=self.kernel_init,
       kernel_axes=('heads', 'kv', 'embed'),
+      weight_dtype=self.config.weight_dtype,
       dtype=self.dtype,
       name='out',
       quant=self.quant)(out)

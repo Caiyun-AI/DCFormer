@@ -77,6 +77,7 @@ class DecoderLayer(nn.Module):
 
     # inputs: embedded inputs to the decoder with shape [batch, length, emb_dim]
     lnx = RMSNorm(
+        weight_dtype=cfg.weight_dtype,
         dtype=cfg.dtype,
         name='pre_self_attention_norm',
         epsilon=cfg.normalization_layer_epsilon,
@@ -207,6 +208,7 @@ class Decoder(nn.Module):
 
     # [batch, length] -> [batch, length, emb_dim]
     y = self.shared_embedding(decoder_input_tokens.astype('int32'))
+    print(f'embedding: {y.dtype}')
     y = nn.Dropout(
         rate=cfg.dropout_rate, broadcast_dims=(-2,))(
             y, deterministic=deterministic)
