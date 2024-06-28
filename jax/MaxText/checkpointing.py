@@ -73,9 +73,9 @@ def load_state_if_possible(checkpoint_manager: CheckpointManager,
   Args:
     checkpoint_manager: if the checkpoint_manager has a valid checkpoint, return
       that TrainState. This enables a full reload of a run in progress.
-    load_parameters_from_path: if there is no checkpoint in the checkpoint manager,
+    load_parameters_path: if there is no checkpoint in the checkpoint manager,
       load parameters from a parameter only checkpoint at this path.
-    load_full_state_from_path: if there is no checkpoint in the checkpoint manager,
+    load_full_state_path: if there is no checkpoint in the checkpoint manager,
       load full state from a full state checkpoint at this path.
     abstract_unboxed_pre_state: an unboxed, abstract TrainState that Orbax
       matches type against.
@@ -93,16 +93,16 @@ def load_state_if_possible(checkpoint_manager: CheckpointManager,
   meta_dict = data_iterator.meta_dict
   checkpoint_step = meta_dict.get('checkpoint_step', None)
 
-  if config.load_full_state_from_path:
-    checkpoint_dir = epath.Path(config.load_full_state_from_path)
-    max_logging.log(f"restoring full state from {config.load_full_state_from_path=}")
+  if config.load_full_state_path:
+    checkpoint_dir = epath.Path(config.load_full_state_path)
+    max_logging.log(f"restoring full state from {config.load_full_state_path=}")
     ckptr = orbax.checkpoint.StandardCheckpointer()
     restored = ckptr.restore(checkpoint_dir, args=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state))
     return  {'state': restored}, None
 
-  elif config.load_parameters_from_path:
-    checkpoint_dir = epath.Path(config.load_parameters_from_path)
-    max_logging.log(f"restoring params from {config.load_parameters_from_path=}")
+  elif config.load_parameters_path:
+    checkpoint_dir = epath.Path(config.load_parameters_path)
+    max_logging.log(f"restoring params from {config.load_parameters_path=}")
     ckptr = orbax.checkpoint.PyTreeCheckpointer()
     restore_args = orbax.checkpoint.checkpoint_utils.construct_restore_args(abstract_unboxed_pre_state.params)
     restored = ckptr.restore(checkpoint_dir, item = {'params': abstract_unboxed_pre_state.params}, transforms={},
@@ -112,7 +112,7 @@ def load_state_if_possible(checkpoint_manager: CheckpointManager,
   elif checkpoint_step is not None:
     max_logging.log(f"restoring params from ’{job_dir}‘ checkpoint_step: {checkpoint_step}")
     checkpoint_dir = job_dir / str(checkpoint_step) / 'state'
-    max_logging.log(f"restoring full state from {config.load_full_state_from_path=}")
+    max_logging.log(f"restoring full state from {config.load_full_state_path=}")
     ckptr = orbax.checkpoint.StandardCheckpointer()
     restored = ckptr.restore(checkpoint_dir, args=orbax.checkpoint.args.StandardRestore(abstract_unboxed_pre_state))
     return  {'state': restored}, None
