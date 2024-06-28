@@ -38,7 +38,7 @@ load_full_state_path: ""
 # If enable_checkpointing is true, an asynchronous checkpointer will be used if
 # async_checkpointing is true, else a synchronous one is used. If you have
 # problems with the checkpointer we recommend trying the synchronous one.
-enable_checkpointing: True
+enable_checkpointing: False
 async_checkpointing: True
 checkpoint_period: 1000
 
@@ -61,22 +61,20 @@ quantization: ""
 # Shard the range finding operation for quantization. By default this is set to number of slices.
 quantization_local_shard_count: -1
 
-decoder_block: "dcformer" # which style of DecoderBlock to use.
+decoder_block: "llama2" # which style of DecoderBlock to use.
 # Global parameter scale needs to be a power of 2. If you want finer grained control of the model sizes
 # then you should explicitly set base_embed_dim, base_num_query_heads, base_num_kv_heads,
 # base_mlp_dim, base_num_decoder_layers and/or head_dim.
 weight_dtype: float32
 global_parameter_scale: 1
-base_emb_dim: 4096
-base_num_query_heads: 32
-base_num_kv_heads: 32
-base_mlp_dim: 5504
-base_num_decoder_layers: 48
+base_emb_dim: 1024
+base_num_query_heads: 16
+base_num_kv_heads: 16
+base_mlp_dim: 2816
+base_num_decoder_layers: 24
 # lsp pax
-window_size: [256, 16384, 256, 3256] # null or list. ex: [256, null]
-num_layers_per_block: 4 # it must equal to widow_size list length, ex: window_size = [256, null], num_layers_per_block = 2
-query_chunk_size: 512 # null or int.
-max_target_length: 16385 # Maximum sequence length
+num_layers_per_block: 2 # it must equal to widow_size list length, ex: window_size = [256, null], num_layers_per_block = 2
+max_target_length: 2049 # Maximum sequence length
 reset_for_eval: True # True will rest eval dataset
 epoch: 1
 train_shuffle_buffer_size: null # null or int
@@ -84,18 +82,11 @@ eval_shuffle_buffer_size: null # null or int
 training_num_batches_to_skip: null # skip data , null or int
 zero_loss: True # whether to compute id zero loss when train
 iter_file_nums: 2 # how many files every file batch
-static_proj: False # default false
-per_device_batch_size: 1.0
-eval_per_device_batch_size: 1.0 # eval also use per_device_batch_size
-eval_loop_num_batches: 648
-eval_interval: 13500  # the specific number of train step between eval_step
-qk_norm: True # 405m use true, but 2b8 model use false
-
-pre_compose: True # pax: PROJECT_LOGITS
-post_compose: True # pax: PROJECT_PROBS
-query_wise: True # pax: TGT_DEPENDENT
-key_wise: True # pax: SRC_DEPENDENT
-  
+per_device_batch_size: 8.0
+eval_per_device_batch_size: 32.0 # eval also use per_device_batch_size
+eval_loop_num_batches: 162
+eval_interval: 2700  # the specific number of train step between eval_step
+ 
 head_dim: 128
 # mixture of experts (moe)
 num_experts: 1
@@ -110,7 +101,7 @@ logits_dot_in_fp32: True  # whether to use fp32 in logits_dense or shared_embedd
 remat_policy: 'full'
 scan_layers: True
 param_scan_axis: 1
-attention: 'dot_product' # Supported attention: dot_product, flash, cudnn_flash_te   , but dcformer only support dot_product
+attention: 'flash' # Supported attention: dot_product, flash, cudnn_flash_te   , but dcformer only support dot_product
 # Combine matmuls for QKV and MLP
 fused_qkv: False
 fused_mlp: False
@@ -179,7 +170,7 @@ dataset_path: ''
 vocab_size: 50256 # powers of 2 for sharding
 eval_split: 'val_with_eos'
 max_corpus_chars: 10_000_000
-dataset_type: pile
+dataset_type: pile # must be c4 or synthetic
 
 # Setting for grain
 grain_worker_count: 4

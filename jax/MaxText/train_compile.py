@@ -61,9 +61,8 @@ def get_topology_mesh(config):
       chips_per_host_bounds=target_hardware.chips_per_host_bounds,
       num_slices=config.compile_topology_num_slices,
   ).devices
-  topology_device_mesh = max_utils.create_device_mesh(config, topology_devices)
-  # topology_device_mesh = max_utils.create_device_mesh(config) # lsp
-
+  topology_device_mesh = max_utils.create_device_mesh(config, topology_devices) # 基于tpu的相关信息，直接可以在任意tpu或者gpu机器上提前编译
+  # topology_device_mesh = max_utils.create_device_mesh(config) # lsp： 这种方法不需要提前知道tpu结构信息，但是需要在运行的机器上进行编译
   topology_mesh = Mesh(topology_device_mesh, config.mesh_axes)
   return topology_mesh
 

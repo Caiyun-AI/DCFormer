@@ -100,7 +100,6 @@ class LlamaDecoderLayer(nn.Module):
         epsilon=cfg.normalization_layer_epsilon,
         )
     lnx = lnx_rms(inputs)
-    print(f'lnx: {lnx.dtype}')
 
     lnx = nn.with_logical_constraint(
         lnx, ('activation_batch', 'activation_length', 'activation_embed'))
@@ -130,8 +129,6 @@ class LlamaDecoderLayer(nn.Module):
             decoder_segment_ids=decoder_segment_ids,
             deterministic=deterministic,
             model_mode=model_mode)
-    print(f'attention_lnx: {attention_lnx.dtype}')
-
     attention_lnx = nn.with_logical_constraint(
         attention_lnx,
         ('activation_batch', 'activation_length', 'activation_embed'))
@@ -146,7 +143,6 @@ class LlamaDecoderLayer(nn.Module):
         epsilon=cfg.normalization_layer_epsilon,
         )(intermediate_inputs)
     hidden_states = nn.with_logical_constraint(hidden_states, ('activation_batch', 'activation_length', 'activation_embed'))
-    print(f'hidden_states: {hidden_states.dtype}')
     # MLP block.
     mlp_lnx = linears.MlpBlock(
         intermediate_dim=cfg.mlp_dim,
@@ -158,8 +154,6 @@ class LlamaDecoderLayer(nn.Module):
         quant=self.quant,
         kernel_init=NormalInitializer(0.006)
     )(hidden_states, deterministic=deterministic)
-
-    print(f'mlp_lnx: {mlp_lnx.dtype}')
 
     mlp_lnx = nn.with_logical_constraint(
         mlp_lnx, ('activation_batch', 'activation_length', 'activation_embed')
