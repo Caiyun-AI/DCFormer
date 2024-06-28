@@ -56,6 +56,8 @@ from cloud_tpu_diagnostics.configuration import debug_configuration
 from cloud_tpu_diagnostics.configuration import diagnostic_configuration
 from cloud_tpu_diagnostics.configuration import stack_trace_configuration
 from etils import epath
+from flax.traverse_util import flatten_dict, unflatten_dict, empty_node
+
 
 if os.environ["HARDWARE"] != "gpu":
   from layers import quantizations
@@ -405,6 +407,7 @@ def train_loop(config, state=None):
       model,
       config
     )
+  
   if isinstance(state, dict):
     state = train_state.TrainState(
       step=state['step'],
@@ -414,6 +417,14 @@ def train_loop(config, state=None):
       tx=None,
 
     )
+  
+  # for k, v in flatten_dict(state.params).items():
+  #   print(k, v.dtype)
+
+  # for k, v in flatten_dict(state.opt_state).items():
+  #   print(k, v.dtype)
+
+  # print(f'state: {state}')
   num_model_parameters = max_utils.calculate_num_params_from_pytree(state.params)
   max_logging.log(f"number parameters: {num_model_parameters/10**9:.5f} billion")
   per_device_tflops = calculate_training_tflops(num_model_parameters, config)

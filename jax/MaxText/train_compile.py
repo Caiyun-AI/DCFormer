@@ -62,7 +62,7 @@ def get_topology_mesh(config):
       num_slices=config.compile_topology_num_slices,
   ).devices
   topology_device_mesh = max_utils.create_device_mesh(config, topology_devices)
-  topology_device_mesh = max_utils.create_device_mesh(config) # lsp
+  # topology_device_mesh = max_utils.create_device_mesh(config) # lsp
 
   topology_mesh = Mesh(topology_device_mesh, config.mesh_axes)
   return topology_mesh
@@ -138,6 +138,15 @@ def main(argv: Sequence[str]) -> None:
 
   # Compile
   print("Jitting and compiling train step...", flush=True)
+  # print(f'func_to_compile: {func_to_compile}')
+  print(f'shaped_train_args: {shaped_train_args}')
+  # print(f'shaped_train_kwargs: {shaped_train_kwargs}')
+  # print(f'topology_mesh: {topology_mesh}')
+  # print(f'in_shard: {in_shard}')
+  # print(f'out_shard: {out_shard}')
+  # print(f'static_argnums: {static_argnums}')
+  # print(f'donate_argnums: {donate_argnums}')
+
   compiled = jit_and_compile(
     func_to_compile,
     shaped_train_args,

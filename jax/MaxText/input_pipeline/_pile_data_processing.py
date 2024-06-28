@@ -132,8 +132,8 @@ class PileDatasets():
         model_needed_inputs['targets'] = data["input_ids"][:, 1: seq_len]
         key = 'labels' if "labels" in data else 'input_ids'
         weights = data[key] >= 0 if self.zero_loss else data[key] > 0
-        model_needed_inputs['targets_segmentation'] = weights[:, :seq_len - 1]
-        model_needed_inputs['inputs_segmentation'] = tf.ones_like(model_needed_inputs['inputs'])
+        model_needed_inputs['targets_segmentation'] = weights[:, :seq_len - 1] # label loss mask
+        model_needed_inputs['inputs_segmentation'] = tf.ones_like(model_needed_inputs['inputs'])  # attention mask
         pos = tf.range(seq_len - 1)
         model_needed_inputs['inputs_position'] = model_needed_inputs['inputs_segmentation'] * pos
         return model_needed_inputs

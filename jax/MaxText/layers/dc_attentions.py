@@ -469,7 +469,7 @@ class AttentionOp(nn.Module):
     b, t, n, _ = query.shape
     h = value.shape[-1]
     s = key.shape[1]
-    # ATtention mask compute
+    # Attention mask compute
     attn_mask = _compute_slide_attn_mask(self.query_chunk_size, self.window_size, t, query.dtype)
 
     if hasattr(self, 'dyn_w_proj'):

@@ -56,7 +56,7 @@ class Embed(nn.Module):
         'embedding',
         with_logical_partitioning(self.embedding_init, ('vocab', 'embed')), # mp, fsdp
         (self.num_embeddings, self.features),
-        self.config.weight_dtype,
+        jnp.float32,
     )
 
   def __call__(self, inputs: Array) -> Array:

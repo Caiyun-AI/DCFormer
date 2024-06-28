@@ -35,6 +35,7 @@ import flax
 from flax.training import train_state
 from flax import linen as nn
 from flax.linen import partitioning as nn_partitioning
+from flax.traverse_util import flatten_dict, unflatten_dict, empty_node
 
 import optax
 import os
@@ -413,6 +414,12 @@ def setup_initial_state(model, data_iterator, tx, config, rng, mesh, checkpoint_
         state = state.replace(params = raw_params)
 
   state = unbox_logicallypartioned(state)
+  params = flatten_dict(unboxed_abstract_state.params)
+  for k, v in params.items():
+    print(k, v.dtype)
+  for k, v in flatten_dict(state.params).items():
+    print(k, v.dtype)
+
   return state, state_mesh_annotations, data_iterator
 
 

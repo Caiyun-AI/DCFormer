@@ -235,7 +235,11 @@ def make_pile_train_iterator(config, mesh, add_bos, add_eos):
   num_local_devices = jax.local_device_count()
 
   job_dir = epath.Path(config.run_name)
-  meta_dict = extract_train_skip_step(job_dir, step=config.training_num_batches_to_skip, only_eval=getattr(config, 'only_eval', False))
+  try:
+    only_eval = config.only_eval
+  except:
+    only_eval = False
+  meta_dict = extract_train_skip_step(job_dir, step=config.training_num_batches_to_skip, only_eval=only_eval)
   # load_full_state_path
   print(f'meta_dict: {meta_dict}')
 
@@ -339,6 +343,6 @@ def get_shaped_batch(config):
   shaped_batch['inputs_position'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
   shaped_batch['inputs_segmentation'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
   shaped_batch['targets'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
-  shaped_batch['targets_position'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
-  shaped_batch['targets_segmentation'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32)
+  # shaped_batch['targets_position'] = jax.ShapeDtypeStruct(batch_shape, jnp.int32) # pile no this key
+  shaped_batch['targets_segmentation'] = jax.ShapeDtypeStruct(batch_shape, jnp.bool)
   return shaped_batch

@@ -294,7 +294,7 @@ class Decoder(nn.Module):
         )
 
     y = self.get_norm_layer()(
-      dtype=cfg.dtype,
+      dtype=jnp.float32,
       name='decoder_norm',
       epsilon=cfg.normalization_layer_epsilon,
       kernel_axes=('embed',),
@@ -339,7 +339,7 @@ class Transformer(nn.Module):
     self.shared_embedding = Embed(
         num_embeddings=cfg.vocab_size,
         features=cfg.emb_dim,
-        dtype=cfg.dtype,
+        dtype=jnp.float32,
         attend_dtype=jnp.float32 if cfg.logits_dot_in_fp32 else cfg.dtype,  # for logit training stability
         embedding_init=NormalInitializer(0.006), # lsp
         name='token_embedder',
