@@ -85,14 +85,15 @@ class DcformerDecoderLayer(nn.Module):
     inputs = nn.with_logical_constraint(
         inputs, ('activation_batch', 'activation_length', 'activation_embed')) # fsdp, 1, mp
 
-
     lnx_rms = models.RMSNorm(
+        weight_dtype=cfg.weight_dtype,
         dtype=cfg.dtype,
         name=f'pre_self_attention_layer_norm_{block_index}',
         kernel_axes=('embed',),
         epsilon=cfg.normalization_layer_epsilon,
         )
     lnx = lnx_rms(inputs)
+    print(f'lnx: {lnx.dtype}')
 
     lnx = nn.with_logical_constraint(
         lnx, ('activation_batch', 'activation_length', 'activation_embed'))
@@ -125,6 +126,7 @@ class DcformerDecoderLayer(nn.Module):
             decoder_segment_ids=decoder_segment_ids,
             deterministic=deterministic,
             model_mode=model_mode)
+    print(f'attention_lnx: {attention_lnx.dtype}')
 
     attention_lnx = nn.with_logical_constraint(
         attention_lnx,
@@ -133,9 +135,13 @@ class DcformerDecoderLayer(nn.Module):
 
     # Fully Connected
     hidden_states = models.RMSNorm(
-        dtype=cfg.dtype, name=f'sub.{block_index}.post_self_attention_layer_norm', kernel_axes=('embed',),
+        weight_dtype=cfg.weight_dtype,
+        dtype=cfg.dtype, 
+        name=f'sub.{block_index}.post_self_attention_layer_norm', kernel_axes=('embed',),
         epsilon=cfg.normalization_layer_epsilon,
         )(intermediate_inputs)
+    print(f'hidden_states: {hidden_states.dtype}')
+
     hidden_states = nn.with_logical_constraint(hidden_states, ('activation_batch', 'activation_length', 'activation_embed'))
 
     # MLP block.
@@ -143,16 +149,19 @@ class DcformerDecoderLayer(nn.Module):
         intermediate_dim=cfg.mlp_dim,
         activations=cfg.mlp_activations,
         intermediate_dropout_rate=cfg.dropout_rate,
+        weight_dtype=cfg.weight_dtype,
         dtype=cfg.dtype,
         name=f'sub.{block_index}.mlp',
         config=cfg,
         quant=self.quant,
         kernel_init=NormalInitializer(0.006),
     )(hidden_states, deterministic=deterministic)
+
+    print(f'mlp_lnx: {mlp_lnx.dtype}')
+
     mlp_lnx = nn.with_logical_constraint(
         mlp_lnx, ('activation_batch', 'activation_length', 'activation_embed')
     )
-
     layer_output = mlp_lnx + intermediate_inputs
 
     layer_output = nn.Dropout(

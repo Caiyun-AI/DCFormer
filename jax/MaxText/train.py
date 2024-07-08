@@ -62,9 +62,6 @@ from flax.traverse_util import flatten_dict, unflatten_dict, empty_node
 if os.environ["HARDWARE"] != "gpu":
   from layers import quantizations
 
-from absl import logging
-from flax import struct as flax_struct
-
 
 Transformer = models.Transformer
 EPS = 1e-8

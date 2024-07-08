@@ -142,8 +142,8 @@ def unbind(ary, n, axis=0):
 
 
 class DynamicWeightProjection(nn.Module):
+  weight_dtype: Optional[Dtype] = jnp.float32
   dtype: Optional[Dtype] = None
-  param_dtype: Dtype = jnp.float32
   precision: PrecisionLike = None
   n_splits: int = None
   num_heads: int = 0
@@ -163,33 +163,42 @@ class DynamicWeightProjection(nn.Module):
     self.num_heads_per_group = self.num_heads // self.num_groups
     kwargs = dict(
       dtype=self.dtype,
+      weight_dtype=self.weight_dtype, 
       use_bias=False,
     )
 
     if self.dynamic_w_init is not None:
       dynamic_hidden_dim = self.num_heads_per_group // self.dynamic_squeeze_ratio \
         if self.dynamic_squeeze_ratio is not None else 2
-      self.dw1 = DenseGeneral(features=(self.num_groups, self.n_splits, self.dynamic_w_hidden_dim),  quant=self.quant,  # 0.00014
-        kernel_init=NormalInitializer(math.sqrt(2.0 / (self.input_dim + self.dynamic_w_hidden_dim))), 
-       kernel_axes=('embed', None, 'heads', 'mlp'),
-        **kwargs)
+      self.dw1 = DenseGeneral(
+                        features=(self.num_groups, self.n_splits, self.dynamic_w_hidden_dim),  
+                        quant=self.quant,  # 0.00014
+                        kernel_init=NormalInitializer(math.sqrt(2.0 / (self.input_dim + self.dynamic_w_hidden_dim))), 
+                        kernel_axes=('embed', None, 'heads', 'mlp'),
+                        **kwargs)
       self.dw_hidden_activation = nn.gelu
-
       G, K, M = self.num_groups, self.dynamic_w_hidden_dim, self.num_heads_per_group
       I = dynamic_hidden_dim * 2
       shape = [G, self.n_splits, K, I, M]
       kernel_init_shard = nn.with_logical_partitioning(NormalInitializer(self.dynamic_w_init), (None, 'data', 'fsdp', None, 'tensor'))
-      self.qkw = self.param('qkw',kernel_init_shard, shape, self.param_dtype)
+      self.qkw = self.param('qkw',kernel_init_shard, shape, self.weight_dtype)
   
     if self.dynamic_d_init is not None:
-      self.dd = DenseGeneral(features=(self.num_groups, self.num_heads_per_group * self.n_splits), quant=self.quant,
-        kernel_init=NormalInitializer(self.dynamic_d_init), kernel_axes=('embed', None, 'mlp'),
-         **kwargs
-        )
+      self.dd = DenseGeneral(
+                        features=(self.num_groups, 
+                        self.num_heads_per_group * self.n_splits), 
+                        quant=self.quant,
+                        kernel_init=NormalInitializer(self.dynamic_d_init), 
+                        kernel_axes=('embed', None, 'mlp'),
+                        **kwargs
+                        )
 
     self.dw_activation = nn.tanh
     # RMSNormScale, compare to RMSNorm. it remove scale
-    self.dw1_norm = nn.RMSNorm(use_scale=False, **{k: v for k, v in kwargs.items() if k not in ['use_bias', 'precision']})
+    self.dw1_norm = nn.RMSNorm(
+                      use_scale=False,
+                       **{k: v for k, v in kwargs.items() if k not in ['use_bias', 'precision']}
+                       )
 
     if self.dynamic_dropout_rate is not None:
       self.dropout = nn.Dropout(self.dynamic_dropout_rate)
@@ -230,7 +239,7 @@ class DynamicWeightProjection(nn.Module):
 
 class CrossHeadProjection(nn.Module):
   dtype: Optional[Dtype] = None
-  param_dtype: Dtype = jnp.float32
+  weight_dtype: Dtype = jnp.float32
   precision: PrecisionLike = None
   squeeze_ratio: float = None
   num_heads: int = 0
@@ -252,11 +261,11 @@ class CrossHeadProjection(nn.Module):
   def setup(self) -> None:
     self.num_heads_per_group = self.num_heads // self.num_groups
     kwargs = dict(
-      dtype=self.dtype,
-      param_dtype=self.param_dtype,
-      use_bias=False,
-      precision=self.precision,
-    )
+                  dtype=self.dtype,
+                  weight_dtype=self.weight_dtype,
+                  use_bias=False,
+                  precision=self.precision,
+                )
     def init_fn(out_dim, in_dim=None):
       if self.init is not None: 
         return self.init
@@ -277,16 +286,16 @@ class CrossHeadProjection(nn.Module):
       if self.squeeze_ratio is None:
         shape=[self.num_groups, self.num_heads_per_group, self.num_heads_per_group]
         scale = init_fn(self.num_heads_per_group)
-        self.w = self.param('w', NormalInitializer(scale), shape, self.param_dtype)
+        self.w = self.param('w', NormalInitializer(scale), shape, self.weight_dtype)
       else:
         self.hidden_dim = self.num_heads_per_group // self.squeeze_ratio
         shape=[self.num_groups, self.num_heads_per_group, self.hidden_dim]
         scale = init_fn(self.hidden_dim)
-        self.w1 = self.param('w1', NormalInitializer(scale), shape, self.param_dtype)
+        self.w1 = self.param('w1', NormalInitializer(scale), shape, self.weight_dtype)
 
         shape=[self.num_groups, self.hidden_dim, self.num_heads_per_group]
         scale = init_fn(self.num_heads_per_group, in_dim=self.hidden_dim)
-        self.w1 = self.param('w2', NormalInitializer(scale), shape, self.param_dtype)
+        self.w1 = self.param('w2', NormalInitializer(scale), shape, self.weight_dtype)
 
   def __call__(self, inputs, qw1 = None, qw2 = None, kw1 = None, kw2 = None, qdd = None, kdd = None):
     shape = inputs.shape  #  (16, 16, 4097, 4097)
@@ -366,13 +375,13 @@ class AttentionOp(nn.Module):
   float32_logits: bool = False
   flash_axis_names: AxisNames = (BATCH, HEAD, LENGTH, D_KV)
   dropout_rate: float = 0.
-  dtype: DType = jnp.float32
+  weight_dtype: Any = jnp.float32
+  dtype: DType = jnp.bfloat16
   quant: Optional[Quant] = None
   is_cross_attention: bool = False
   dynamic_dropout_rate: float = None
   precision: PrecisionLike = None
   num_groups: int = 1
-  param_dtype: Any = jnp.bfloat16
   head_dim: int = 128
   deterministic: bool = False
   window_size: int = None
@@ -380,7 +389,6 @@ class AttentionOp(nn.Module):
   static_proj: bool = True
   pre_compose: bool = True
   post_compose: bool = True
-
 
   def setup(self):
     input_dim = self.num_query_heads * self.head_dim
@@ -390,26 +398,30 @@ class AttentionOp(nn.Module):
     if self.is_cross_attention:
       for name in ['q_dyn_w_proj', 'k_dyn_w_proj']:
         setattr(self, name, DynamicWeightProjection(
+          weight_dtype=self.weight_dtype,
+          dtype=self.dtype,
           num_heads=self.num_query_heads, num_groups=self.num_groups,
           input_dim=self.num_query_heads * self.head_dim, n_splits=2,
           dynamic_w_init=math.sqrt(1 / dynamic_w_hidden_dim) * 2 / (num_heads_per_group + I) * 0.01,
           dynamic_d_init=math.sqrt(2 / (input_dim + num_heads_per_group)) * 0.005,
           dynamic_squeeze_ratio=num_heads_per_group // I,
           dynamic_w_hidden_dim=dynamic_w_hidden_dim,
-          dtype=self.dtype, param_dtype=self.param_dtype, precision=self.precision,
+          dtype=self.dtype, weight_dtype=self.weight_dtype, precision=self.precision,
           deterministic=self.deterministic,
           dynamic_dropout_rate=self.dynamic_dropout_rate,
           quant=self.quant,
         ))
     else:
       self.dyn_w_proj = DynamicWeightProjection(
+        weight_dtype=self.weight_dtype,
+        dtype=self.dtype,
         num_heads=self.num_query_heads, num_groups=self.num_groups,
         input_dim=self.num_query_heads * self.head_dim, n_splits=4,
         dynamic_w_init=math.sqrt(1 / dynamic_w_hidden_dim) * 2 / (num_heads_per_group + I) * 0.01,
         dynamic_d_init=math.sqrt(2 / (input_dim + num_heads_per_group)) * 0.005,
         dynamic_squeeze_ratio=num_heads_per_group // I,
         dynamic_w_hidden_dim=dynamic_w_hidden_dim,
-        dtype=self.dtype, param_dtype=self.param_dtype, precision=self.precision,
+        dtype=self.dtype, weight_dtype=self.weight_dtype, precision=self.precision,
         deterministic=self.deterministic,
         dynamic_dropout_rate=self.dynamic_dropout_rate,
         quant=self.quant,
@@ -418,7 +430,7 @@ class AttentionOp(nn.Module):
     if self.pre_compose:
       self.pre_proj = CrossHeadProjection(
                                   dtype=self.dtype, 
-                                  param_dtype=self.param_dtype, 
+                                  weight_dtype=self.weight_dtype, 
                                   precision=self.precision,
                                   num_heads=self.num_query_heads, 
                                   num_groups=self.num_groups,
@@ -430,7 +442,7 @@ class AttentionOp(nn.Module):
     if self.post_compose:
       self.post_proj = CrossHeadProjection(
                                   dtype=self.dtype, 
-                                  param_dtype=self.param_dtype, 
+                                  weight_dtype=self.weight_dtype, 
                                   precision=self.precision,
                                   num_heads=self.num_query_heads, 
                                   num_groups=self.num_groups,
@@ -872,6 +884,7 @@ class Attention(nn.Module):
       axis=-1,
       kernel_init=self.kernel_init, # lsp
       kernel_axes=('embed', 'heads', 'kv'), # fsdp, mdl, None
+      weight_dtype=self.config.weight_dtype,
       dtype=self.dtype,
       name='query',
       quant=self.quant)(inputs_q)
@@ -899,6 +912,7 @@ class Attention(nn.Module):
         axis=-1,
         kernel_init=self.kernel_init, # lsp
         kernel_axes=('embed', 'heads', 'kv'),
+        weight_dtype=self.config.weight_dtype,
         dtype=self.dtype,
         name=proj_name,
         quant=self.quant)(inputs_kv)
@@ -908,11 +922,12 @@ class Attention(nn.Module):
     """ Fused QKV projection"""
 
     qkv_proj = DenseGeneral(
-      features=(3, self.num_query_heads, self.head_dim),
-      axis = -1,
-      kernel_init=self.kernel_init, # lsp
+        features=(3, self.num_query_heads, self.head_dim),
+        axis = -1,
+        kernel_init=self.kernel_init, # lsp
         kernel_axes=('embed', 'qkv', 'heads', 'kv'),
         dtype=self.dtype,
+        weight_dtype=self.config.weight_dtype,
         name=proj_name,
         quant=self.quant)(inputs)
     query, key, value = qkv_proj[:,:,0,...], qkv_proj[:,:,1,...], qkv_proj[:,:,2,...]
@@ -920,13 +935,14 @@ class Attention(nn.Module):
 
   def out_projection(self, output_dim: int, out: Array) -> Array:
     out_proj = DenseGeneral(
-      features=output_dim,
-      axis=(-2, -1),
-      kernel_init=self.kernel_init, # lsp
-      kernel_axes=('heads', 'kv', 'embed'),
-      dtype=self.dtype,
-      name='out',
-      quant=self.quant)(out)
+        features=output_dim,
+        axis=(-2, -1),
+        kernel_init=self.kernel_init, # lsp
+        kernel_axes=('heads', 'kv', 'embed'),
+        weight_dtype=self.config.weight_dtype,
+        dtype=self.dtype,
+        name='out',
+        quant=self.quant)(out)
     return out_proj
 
   def key_rotary(self, key: Array, inputs_positions: Array):
@@ -978,12 +994,14 @@ class Attention(nn.Module):
     # lsp qk norm
     if self.config.qk_norm:
       query = RMSNorm(
+        weight_dtype=self.config.weight_dtype,
         dtype=self.config.dtype,
         name=f'q_norm',
         kernel_axes=('embed',),
         epsilon=self.config.normalization_layer_epsilon,
         )(query)
       key = RMSNorm(
+        weight_dtype=self.config.weight_dtype,
         dtype=self.config.dtype,
         name=f'k_norm',
         kernel_axes=('embed',),
@@ -1022,6 +1040,7 @@ class Attention(nn.Module):
                                num_query_heads=self.num_query_heads,
                                num_kv_heads=self.num_kv_heads,
                                dropout_rate = self.dropout_rate,
+                               weight_dtype=self.weight_dtype,
                                dtype=self.dtype,
                                head_dim=value.shape[-1],
                                query_chunk_size=query_chunk_size,
