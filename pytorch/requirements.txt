@@ -1,0 +1,5 @@
+orbax-checkpoint==0.5.20
+jax==0.4.30
+torch==2.3.0
+flax==0.8.0
+smart_open[all]

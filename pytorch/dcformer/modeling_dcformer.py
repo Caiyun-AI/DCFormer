@@ -301,7 +301,7 @@ class CrossHeadProjection(nn.Module):
             qw1, qw2, kw1, kw2, qdd, kdd = dws
             inputs = inputs.unsqueeze(1) #BNTS->BGNTS
             # apply sw 
-            ret = torch.einsum('BGMTS,GMN->BGNTS', inputs, self.w) if self.use_sw else inputs
+            ret = torch.einsum('BGMTS,GMN->BGNTS', inputs, self.w) + inputs if self.use_sw else inputs
             if fast_infer:
                 inputs_label = 'BGMTS'
                 hidden_sym = 'I'; hidden_label = inputs_label.replace('M', 'I') # BGITS
