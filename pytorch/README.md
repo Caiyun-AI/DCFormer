@@ -55,3 +55,15 @@ with torch.no_grad():
     text = tokenizer.decode(generated_ids[0])
     print('generated text:', text)
 ```
+
+
+### Model conversion
+You can convert MaxText model weight to PyTorch model weight with the script [(maxtext2torch.py)](https://github.com/Caiyun-AI/DCFormer/blob/main/pytorch/dcformer/maxtext2torch.py) as follows. You need to pass model directory and checkpoint step to `model_path` and `step` respectively, where the model directory can be a local path (eg. `/home/xxx/projects/dcformer/checkpoints`) or a bucket path. Note that you have to adjust model config and rematch parameter keys for custom modification. 
+
+```
+pip install -r requirements.txt
+cd dcformer
+python maxtext2torch.py --model_path gs://bucket/dcformer/checkpoints --step 14000
+
+```
+
