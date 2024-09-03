@@ -1,6 +1,7 @@
 import json
 import os
 from collections import defaultdict
+import sys
 
 os.environ["JAX_PLATFORMS"] = "cpu"
 
@@ -13,28 +14,23 @@ import torch
 import numpy as np
 import argparse
 
-def load_model(read_dir, load_step=None):
-    step_prefix = "checkpoint"
-    step_format_fixed_length = 8
 
+def load_model(read_dir, load_step=None):
     options = orbax.checkpoint.CheckpointManagerOptions()
-    key = "default" # 'state' # model_path under step directory 
+    key = "state" # 'state' # model_path under step directory 
     item = {
-        key: orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler(use_ocdbt=True))
+        key: orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler(use_ocdbt=False))
     }
     print('read_dir here', read_dir)
     mngr = orbax.checkpoint.CheckpointManager(read_dir, item, options)
-    
+
     if load_step is None:
         load_step = mngr.latest_step()
-        checkpoint_name = 'latest'
-    else:
-        checkpoint_name = f"{step_prefix}_" + str(load_step).zfill(step_format_fixed_length)
 
     print('load_step', load_step)
     with jax.default_device(jax.devices("cpu")[0]):
-        weights = mngr.restore(load_step, items=item)
-    
+        weights = mngr.restore(load_step)
+
     # save torch model
     params = weights[key]['params']
     flat_weights = {".".join(k): v.astype('float16') for k, v in flatten_dict(params).items()}
@@ -44,9 +40,9 @@ def load_model(read_dir, load_step=None):
     print('load weights done')
     return flat_weights
 
-def update_weight_from_maxtext(model, w, vocab_size=50304, num_blocks=2, model_dim=1024, num_heads=16, head_dim=128):
+def update_weight_from_maxtext(model, w, vocab_size=50304, num_blocks=2, model_dim=1024, num_heads=16):
     map_dict={'w1': 'wi_0', 'w3': 'wi_1', 'w2': 'wo', 'weight': 'w', 'dd': 'dd.kernel', 'dw1': 'dw1.kernel'} # 'pre_proj': 'pre_proj', 'post_proj': 'post_proj'
-    N, E, H, D = vocab_size, model_dim, num_heads, head_dim
+    N, E, H, D = vocab_size, model_dim, num_heads, model_dim // num_heads
     state_dict = {}
     for k, v in model.named_parameters():
         if k == 'tok_embeddings.weight':
@@ -89,7 +85,6 @@ def update_weight_from_maxtext(model, w, vocab_size=50304, num_blocks=2, model_d
     return model
 
 
-
 if __name__ == '__main__':
     '''
     run command:
@@ -112,13 +107,13 @@ if __name__ == '__main__':
     from configuration_dcformer import DCFormerConfig
     from modeling_dcformer import DCFormer
     # DCFormer-Medium
-    config = {"vocab_size": 50256,"n_layer": 24, "n_head":16, "head_dim": 128, "dim": 1024, "use_qk_norm": True, "window_type": "LG", "window_size": 256, "rope_base":10000}
+    config = {"vocab_size": 50256,"n_layer": 24, "n_head":16, "dim": 1024, "use_qk_norm": True, "window_type": "LG", "window_size": 256, "rope_base":10000}
     config = DCFormerConfig(**config)
     model = DCFormer(config) 
     print('init dcformer done')
 
     # convert maxtext model weight to pytorch model weight
-    model = update_weight_from_maxtext(model, weights, vocab_size=50256, num_blocks=2, model_dim=1024, num_heads=16, head_dim=128)
-    model.save_pretrained("dcformer_medium.pth", safe_serialization=False)
+    model = update_weight_from_maxtext(model, weights, vocab_size=50256, num_blocks=2, model_dim=1024, num_heads=16)
+    model.save_pretrained("dcformer_medium_pytorch", safe_serialization=False)
     print('converted')
 
