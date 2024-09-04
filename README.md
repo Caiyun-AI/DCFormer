@@ -4,7 +4,7 @@ This repository contains the code in both PyTorch and Jax for our paper.
 
 > [**Improving Transformers with Dynamically Composable Multi-Head Attention**](https://arxiv.org/abs/2405.08553)\
 > Da Xiao, Qingye Meng, Shengping Li, Xingyuan Yuan\
-> ICML 2024
+> ICML 2024 (<strong>oral</strong>)
 
 ![DCFormer](assets/DCMHA_arch.jpg "DCMHA")
 
