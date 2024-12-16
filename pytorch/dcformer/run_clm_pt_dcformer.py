@@ -45,7 +45,8 @@ import torch.nn as nn
 from sklearn.metrics import accuracy_score
 from modeling_dcformer import DCFormer
 from safetensors.torch import load_file
-
+import re
+pattern = re.compile(r'\d+\.bin$')
 
 def compile_model(
     model,
@@ -62,7 +63,7 @@ def load_dcformer(checkpoint_path, config=None, device='cpu',  batch_size=1):
 
     state_dict = {}
     for filename in os.listdir(checkpoint_path):
-        if filename.endswith('.bin'):
+        if filename.endswith('.bin') or pattern.search(filename):
             file_path = os.path.join(checkpoint_path, filename)
             state_dict.update(torch.load(file_path))
         elif filename.endswith('.safetensors'):
