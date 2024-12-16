@@ -64,10 +64,10 @@ def load_dcformer(checkpoint_path, config=None, device='cpu',  batch_size=1):
     for filename in os.listdir(checkpoint_path):
         if filename.endswith('.bin'):
             file_path = os.path.join(checkpoint_path, filename)
-            state_dict.update(torch.load(file_path, map_location='cpu'))
+            state_dict.update(torch.load(file_path))
         elif filename.endswith('.safetensors'):
             file_path = os.path.join(checkpoint_path, filename)
-            state_dict.update(load_file(file_path, map_location='cpu'))
+            state_dict.update(load_file(file_path))
 
     dcformer.load_state_dict(state_dict, strict=False)
 
