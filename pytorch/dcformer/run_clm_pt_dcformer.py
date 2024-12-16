@@ -43,7 +43,7 @@ from transformers.utils import send_example_telemetry
 from transformers.utils.versions import require_version
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
-from modeling_dcformer_last_bf16_add_dtype import DCFormer
+from modeling_dcformer import DCFormer
 from safetensors.torch import load_file
 
 
