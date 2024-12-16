@@ -19,58 +19,65 @@ except:
 from transformers.modeling_utils import PreTrainedModel
 
 
+
 class KVKWCache(nn.Module):
-    def __init__(self, max_batch_size, max_seq_length, n_heads, head_dim, window_size=2048, dtype=torch.float16, use_kw_cache=True):
+    def __init__(self, max_batch_size, max_seq_length, n_heads, head_dim, window_size=2048, dtype=torch.bfloat16, use_kw_cache=True):
         super().__init__()
         self.head_dim = head_dim
         self.kw_dim = 2 * n_heads 
         self.n_heads = n_heads
-        self.window_size = window_size
+        self.window_size = window_size  # 256 None 256 256
         self.use_kw_cache = use_kw_cache 
         if window_size is None:
             self.seq_length = max_seq_length
         else:
-            self.seq_length = min(window_size, max_seq_length)
+            self.seq_length = min(2 * window_size, max_seq_length) # lsp
         cache_shape = (max_batch_size, n_heads, self.seq_length, head_dim)
         kw_cache_shape = (max_batch_size, self.seq_length, 2, n_heads, n_heads)
+        kw_sub_cache_shape = (max_batch_size, self.seq_length, 5, 2, n_heads) # BT(4+1)2N R=2  kw12: BT42N , kdd: BT2N
         self.register_buffer('k_cache', torch.zeros(cache_shape, dtype=dtype))
         self.register_buffer('v_cache', torch.zeros(cache_shape, dtype=dtype))
-        if self.use_kw_cache:
-            self.register_buffer('kw_cache', torch.zeros(kw_cache_shape, dtype=dtype))
 
-    def update(self, input_pos, k_val, v_val, kw_val=None): # kw_val B,N,S,2,N      B2NSD
-        # input_pos: [S], k_val: [B, H, S, D]
+        self.register_buffer('kw_cache', torch.zeros(kw_cache_shape, dtype=dtype))
+        self.register_buffer('kw_sub_cache', torch.zeros(kw_sub_cache_shape, dtype=dtype))
+
+
+    def update(self, input_pos, values, batch_indexes=None, count=None): # kw_val B,N,S,2,N      B2NSD
+        # batch_indexes: tensor([0, 3, 1, 2])  # shape: (batch, )
+        k_val, v_val, kw_val, kw_sub  = values
         assert input_pos.shape[-1] == k_val.shape[2]
-        B,N,S,D = v_val.shape
-        k_out = self.k_cache
-        v_out = self.v_cache
-        if self.use_kw_cache:
-            kw_out = self.kw_cache
-        else:
-            kw_out = None
+        input_pos = input_pos % self.seq_length # bl
 
-        if self.window_size is None:
-            k_out[:, :, input_pos] = k_val
-            v_out[:, :, input_pos] = v_val
-            if self.use_kw_cache and kw_val is not None:
-                kw_out[:,input_pos] = kw_val
-        elif S == 1: 
-            input_pos = input_pos % self.seq_length
-            v_out[:, :, input_pos] = v_val
-            k_out[:, :, input_pos] = k_val
-            if self.use_kw_cache and kw_val is not None:
-                kw_out[:,input_pos] = kw_val
-        else: # prefill
-            start = max(0, input_pos[-1]-self.seq_length+1)
-            input_pos = input_pos[start:] % self.seq_length
-            v_out[:, :, input_pos] = v_val[:,:,start:]
-            k_out[:, :, input_pos] = k_val[:,:,start:]
-            if self.use_kw_cache and kw_val is not None:
-                kw_out[:, input_pos] = kw_val[:,start:]
-        return k_out, v_out, kw_out 
+        input_pos1 = input_pos[:, None, :, None].repeat(1, self.n_heads, 1, self.head_dim)
+        self.k_cache[batch_indexes] = self.k_cache[batch_indexes].scatter_(2, input_pos1, k_val)
+        self.v_cache[batch_indexes] = self.v_cache[batch_indexes].scatter_(2, input_pos1, v_val)
+        if kw_val is not None:
+            input_pos2 = input_pos[..., None, None, None].repeat(1, 1, *kw_val.shape[-3:])
+            self.kw_cache[batch_indexes] = self.kw_cache[batch_indexes].scatter_(1, input_pos2, kw_val)
+
+        if kw_sub is not None:
+            input_pos3 = input_pos[..., None, None, None].repeat(1, 1, *kw_sub.shape[-3:])
+            self.kw_sub_cache[batch_indexes] = self.kw_sub_cache[batch_indexes].scatter_(1, input_pos3, kw_sub)
+
+        return self.k_cache[batch_indexes], self.v_cache[batch_indexes], self.kw_cache[batch_indexes], self.kw_sub_cache[batch_indexes]
+    
+
+def extract_dtype_callable(dtype):
+    if not isinstance(type, str):
+        return dtype
+    if 'bfloat16' in dtype:
+        new_dtype = torch.bfloat16
+    elif 'float16' in dtype:
+        new_dtype = torch.float16
+    elif 'float32' in dtype or 'float' in dtype:
+        new_dtype = torch.float32
+    else:
+        raise ValueError(f'Unknow dtype: {dtype}, it must in torch.float16, torch.bfloat16, torch.float32....')
+    return new_dtype
 
 class DCFormer(PreTrainedModel):
     config_class=DCFormerConfig
+    _no_split_modules = ["DCFormerBlock"] 
     '''
     DCFormer's implementation is adapted from https://github.com/pytorch-labs/gpt-fast/blob/main/model.py#L89 
     '''
@@ -89,36 +96,66 @@ class DCFormer(PreTrainedModel):
         self.freqs_cis: Optional[Tensor] = None
         self.mask_cache: Optional[Tensor] = None
         self.window_size = config.window_size
-        self.max_batch_size = -1
-        self.max_seq_length = -1
 
-    def setup_caches(self, max_batch_size, max_seq_length, set_kv_cache=True):
-        if self.max_seq_length >= max_seq_length and self.max_batch_size >= max_batch_size:
-            return
+        self.max_seq_length = config.block_size 
+        # torch.bfloat16, torch.float16, torch.float32 etc..
+
+        self.torch_dtype = extract_dtype_callable(config.torch_dtype)
+
+        # lsp: 最大的kv cache长度为4096.不管是global还是local window
+        self.cache_length = min(config.block_size, 4096) if config.prefill_pad else config.block_size
+
+    def setup_caches(self, max_batch_size,  set_kv_cache=True):
         head_dim = self.config.dim // self.config.n_head
-        max_seq_length = find_multiple(max_seq_length, 8)
-        self.max_seq_length = max_seq_length
+        max_seq_length = find_multiple(self.max_seq_length, 8)
+        
         self.max_batch_size = max_batch_size
+        self.max_seq_length = max_seq_length
+
         if not self.is_training:
             for b in self.layers:
-                if set_kv_cache:
-                    use_kw_cache = False if b.attention.query_wise else True
-                    b.attention.kv_cache = KVKWCache(max_batch_size, max_seq_length, self.config.n_local_heads, head_dim, window_size=b.attention.window_size, use_kw_cache=use_kw_cache)
+                b.attention.kv_cache = KVKWCache(max_batch_size, self.cache_length, self.config.n_local_heads, head_dim, window_size=b.attention.window_size,dtype=self.torch_dtype, use_kw_cache=True) 
                 b.attention.dyn_w_proj.merge_weights()
                 if not b.attention.use_sw:
                     dtype = b.attention.wo.weight.dtype
                     device = b.attention.wo.weight.device
+
                     b.attention.dyn_w_proj.sw = b.attention.dyn_w_proj.sw.to(device=device, dtype=dtype)
                     b.attention.dyn_w_proj.pre_proj.w = b.attention.dyn_w_proj.pre_proj.w.to(device=device, dtype=dtype) 
                     b.attention.dyn_w_proj.post_proj.w = b.attention.dyn_w_proj.post_proj.w.to(device=device, dtype=dtype) 
                 
-        self.freqs_cis = precompute_freqs_cis(self.config.block_size, self.config.dim // self.config.n_head, self.config.rope_base).to(self.tok_embeddings.weight.device)
-        if self.is_training:
-            self.causal_mask = torch.tril(torch.ones(self.config.block_size, self.config.block_size, dtype=torch.bool, device=self.tok_embeddings.weight.device))
-        elif self.window_size is None:
-            self.causal_mask = torch.tril(torch.ones(max_seq_length, max_seq_length, dtype=torch.bool, device=self.tok_embeddings.weight.device))
+        self.freqs_cis = precompute_freqs_cis(self.config.block_size, self.config.dim // self.config.n_head, self.config.rope_base, dtype=self.torch_dtype).to(self.tok_embeddings.weight.device)
+        if self.window_size is None:
+            self.causal_mask = torch.tril(torch.ones(max_seq_length, self.cache_length, dtype=torch.bool, device=self.tok_embeddings.weight.device))
+        elif self.is_training:
+            for b in self.layers:
+                b.attention.dyn_w_proj.merge_weights()
+            assert self.window_size is not None
+ 
+            global_mask = torch.tril(torch.ones(max_seq_length, max_seq_length, dtype=torch.bool, device=self.tok_embeddings.weight.device))
+            local_mask = make_window_mask(max_seq_length, self.window_size).to(device=self.tok_embeddings.weight.device)
+            self.causal_mask = [local_mask, global_mask]
+            
         else:
-            self.causal_mask = torch.stack([make_window_mask(max_seq_length, self.config.window_size), torch.tril(torch.ones(self.max_seq_length, self.max_seq_length, dtype=torch.bool))]) # LG
+            
+            window_size = self.window_size
+            global_mask = torch.tril(torch.ones(self.max_seq_length, self.cache_length, dtype=torch.bool))
+
+            _local_mask = make_window_mask(window_size * 2, window_size - 1).bool() # -1 的时候加自身的关注长度为window_size
+            ms = []
+            print("1111223")
+            print(max_seq_length // window_size - 2)
+            print(_local_mask)
+            print(window_size)
+            print("fgjksdfhsklf....")
+            for i in range(max_seq_length // window_size - 2):
+                _m = torch.roll(_local_mask[window_size:].clone(), shifts=(i + 1) * window_size, dims=1)
+                ms.append(_m)
+            print(ms)
+            ms = torch.cat(ms, dim=0)
+            local_mask = torch.cat([_local_mask, ms], dim=0)
+
+            self.causal_mask = [local_mask, global_mask, local_mask]
     
     def generate(self, input_ids, num_tokens_to_generate=10, compiled_decode_one_token=None):
         batch_size, seq_length = input_ids.shape
@@ -149,29 +186,69 @@ class DCFormer(PreTrainedModel):
         new_token = torch.argmax(logits[:, -1], dim=-1)[:,None]
         return new_token
 
-    def forward(self, idx: Tensor, input_pos: Optional[Tensor] = None, return_tensor=False) -> Tensor:
+    def forward(self, idx: Tensor, labels=None, input_pos: Optional[Tensor] = None, return_tensor=False, batch_indexes=None, count=None) -> Tensor:
         assert self.freqs_cis is not None, "Caches must be initialized first"
         if input_pos is None:
             input_pos = torch.arange(idx.shape[-1], device=idx.device, dtype=torch.int)
-        if self.window_size is None or self.is_training:
-            mask = self.causal_mask[None, None, input_pos]
+       
+        if self.window_size is None :
+            if self.is_training:
+                mask = self.causal_mask[None, None, input_pos] 
+            else:
+                mask = []
+                for ips in input_pos:
+                    m = self.causal_mask[None, None, ips] 
+                    mask.append(m)
+                mask = torch.cat(mask, dim=0)
+        elif self.is_training:
+            mask = [m[None, None, input_pos] for m in self.causal_mask]
         else:
-            mask = self.causal_mask[None, None,:,input_pos]
-        freqs_cis = self.freqs_cis[input_pos][:idx.shape[-1]]
+            mask = []
+            for cm in self.causal_mask:
+                ms = []
+                for ips in input_pos:
+                    m = cm[None, None, ips]
+                    ms.append(m)
+                ms = torch.cat(ms, dim=0)
+                mask.append(ms)
+
+        if self.is_training:
+            freqs_cis = self.freqs_cis[input_pos][:idx.shape[-1]]
+
+        else:
+            freqs_cis = [] # batch
+            for p in input_pos:
+                _freqs_cis = self.freqs_cis[p][:idx.shape[-1]].unsqueeze(0)  # self.freqs_cis: l * 64 * 2
+                freqs_cis.append(_freqs_cis)
+            freqs_cis = torch.cat(freqs_cis, dim=0)
+
+
         x = self.tok_embeddings(idx)
         for i, layer in enumerate(self.layers):
-            if self.is_training or self.window_size is None :
+            if self.window_size is None :
                 layer_mask = mask
                 gen_mask = None
-            elif self.window_size is not None: 
-                layer_mask = mask[:,:,1] if layer.attention.window_size is None else mask[:,:,0]
-                gen_mask = mask[:,:,1] if layer.attention.window_size is not None else None 
+            elif self.is_training:
+                layer_mask = mask[1] if layer.attention.window_size is None else mask[0]
+                gen_mask = None
+            elif self.window_size is not None:   # here
+               
+                layer_mask = mask[1] if layer.attention.window_size is None else mask[0]
+                gen_mask = mask[2] if layer.attention.window_size is not None else None 
+
             if self.use_gradient_checkpointing:
                 x = checkpoint(layer, x, input_pos, freqs_cis, layer_mask)
             else:
-                x = layer(x, input_pos, freqs_cis, layer_mask, gen_mask=gen_mask)
+                x = layer(x, input_pos, freqs_cis, layer_mask, gen_mask=gen_mask, batch_indexes=batch_indexes, count=count)
         x = self.norm(x)
+
         logits = self.output(x)
+
+        if self.is_training and labels is not None:
+            loss_func = nn.CrossEntropyLoss()
+            loss = loss_func(logits[:,:-1].reshape(-1, logits.shape[-1]), labels[:,1:].to(logits.device).flatten())
+            CausalLMOutput = namedtuple("CausalLMOutput", ["loss", "logits"])
+            return CausalLMOutput(loss=loss, logits=logits)
         if return_tensor:
             return logits
         else:
@@ -187,14 +264,14 @@ class DCFormerBlock(nn.Module):
         self.ffn_norm = RMSNorm(config.dim, config.norm_eps)
         self.attention_norm = RMSNorm(config.dim, config.norm_eps)
 
-    def forward(self, x: Tensor, input_pos: Tensor, freqs_cis: Tensor, mask: Tensor, gen_mask=None) -> Tensor:
-        h = x + self.attention(self.attention_norm(x), freqs_cis, mask, input_pos, gen_mask=gen_mask, fast_infer=True)
+    def forward(self, x: Tensor, input_pos: Tensor, freqs_cis: Tensor, mask: Tensor, gen_mask=None, batch_indexes=None, count=None) -> Tensor:
+        h = x + self.attention(self.attention_norm(x), freqs_cis, mask, input_pos, gen_mask=gen_mask, fast_infer=True, batch_indexes=batch_indexes, count=count)
         out = h + self.feed_forward(self.ffn_norm(h))
         return out
 
 class DynamicWeightProjection(nn.Module):
-
-    def __init__(self, num_heads=32, num_groups=1, residual=True, query_input_dim=4096, dynamic_squeeze_ratio=16, dynamic_w_hidden_dim=128,dtype=torch.float16,use_sw=False):
+    
+    def __init__(self, num_heads=32, num_groups=1, residual=True, query_input_dim=4096, dynamic_squeeze_ratio=16, dynamic_w_hidden_dim=128,dtype=torch.bfloat16,use_sw=False):
         super().__init__()
         self.num_heads = num_heads 
         self.num_groups = num_groups 
@@ -206,8 +283,8 @@ class DynamicWeightProjection(nn.Module):
         self.dw_activation = nn.Tanh()
         self.dw1_norm = RMSnormNoscale(dim=-1)
         self.use_sw = use_sw
-        self.pre_proj = CrossHeadProjection('pre', num_heads=self.num_heads, use_sw=use_sw)
-        self.post_proj = CrossHeadProjection('post', num_heads=self.num_heads, use_sw=use_sw)
+        self.pre_proj = CrossHeadProjection('pre', num_heads=self.num_heads, use_sw=use_sw, dtype=dtype)
+        self.post_proj = CrossHeadProjection('post', num_heads=self.num_heads, use_sw=use_sw, dtype=dtype)
 
         dynamic_hidden_dim = self.num_heads_per_group // self.dynamic_squeeze_ratio 
         self.dynamic_hidden_dim = dynamic_hidden_dim 
@@ -226,7 +303,8 @@ class DynamicWeightProjection(nn.Module):
             self.sw = nn.parameter.Parameter(torch.stack([self.pre_proj.w, self.post_proj.w]).squeeze(1) + torch.eye(self.num_heads) ).to(self.dw1.device) # (2,N,N) sw + identity matrix
         else:
             self.sw = (torch.eye(self.num_heads).expand(2,self.num_heads,self.num_heads)).to(self.dw1.device) # identity matrix (2,N,N)
-        
+
+
     def forward(self,query_vec,KW:Optional[torch.Tensor]=None, gen_cache:Optional[bool]=True):  
         dw_hidden = torch.einsum('BTD,DGCK->BTGCK', query_vec, self.dw1)  # C=4 [pre,post]*[query,key]
         dw_hidden = self.dw_hidden_activation(dw_hidden) #BTGCK
@@ -277,7 +355,7 @@ class RMSnorm(nn.Module):
 
 class CrossHeadProjection(nn.Module):
 
-    def __init__(self, mode, num_heads=16, num_groups=1, dtype=torch.float16, use_sw=False):
+    def __init__(self, mode, num_heads=16, num_groups=1, dtype=torch.bfloat16, use_sw=False):
         super().__init__()
         self.mode = mode
         self.use_sw = use_sw
@@ -301,7 +379,7 @@ class CrossHeadProjection(nn.Module):
             qw1, qw2, kw1, kw2, qdd, kdd = dws
             inputs = inputs.unsqueeze(1) #BNTS->BGNTS
             # apply sw 
-            ret = torch.einsum('BGMTS,GMN->BGNTS', inputs, self.w) + inputs if self.use_sw else inputs
+            ret = torch.einsum('BGMTS,GMN->BGNTS', inputs, self.w) if self.use_sw else inputs
             if fast_infer:
                 inputs_label = 'BGMTS'
                 hidden_sym = 'I'; hidden_label = inputs_label.replace('M', 'I') # BGITS
@@ -316,10 +394,12 @@ class CrossHeadProjection(nn.Module):
                         out = torch.einsum(eqn2.replace(hidden_sym, ''), hidden, w2[..., i, :]) #  'BG(I)TS,BTG(I)M->BGMTS'
                         ret = ret + out
                 # apply qdd and kdd
+                del out
                 for sym, dd in zip(['T', 'S'], [qdd, kdd]):
                     dd_label = f'B{sym}GM'
                     dout = torch.einsum(f'{inputs_label},{dd_label}->{inputs_label}', inputs, dd) # BGMTS,B(T/S)GM->BGMTS
                     ret = ret + dout
+                del dout
             else:
                 # apply qw and kw (BTGIN)
                 x_inter = torch.einsum('BGNTS, BTGIN->BGTSI', inputs, qw1)
@@ -343,7 +423,7 @@ class DCMHAttention(nn.Module):
         total_head_dim = (config.n_head + 2 * config.n_local_heads) * config.head_dim
         # key, query, value projections for all heads, but in a batch
         self.lidx = lidx
-        self.wqkv = nn.Linear(config.dim, total_head_dim, bias=False)
+        self.wqkv = nn.Linear(config.dim, total_head_dim, bias=False)  #放大到3倍。
         self.wo = nn.Linear(config.dim, config.dim, bias=False)
         self.kv_cache = None
 
@@ -355,8 +435,11 @@ class DCMHAttention(nn.Module):
         self.use_dcmha = config.use_dcmha 
         self.scale_factor = 1 / math.sqrt(self.head_dim)
         self.q_chunk_size = config.q_chunk_size 
-        self.use_sw = use_sw 
-        self.dyn_w_proj = DynamicWeightProjection(num_heads=self.n_head, query_input_dim=config.dim, dynamic_squeeze_ratio=self.n_head//2, dynamic_w_hidden_dim=self.n_head*4, use_sw=use_sw)
+        self.use_sw = use_sw #
+        self.torch_dtype = extract_dtype_callable(config.torch_dtype)
+
+        # self.torch_dtype = torch.bfloat16
+        self.dyn_w_proj = DynamicWeightProjection(num_heads=self.n_head, query_input_dim=config.dim, dynamic_squeeze_ratio=self.n_head//2, dynamic_w_hidden_dim=self.n_head*4, dtype=self.torch_dtype, use_sw=use_sw)
         self.use_qk_norm = config.use_qk_norm 
         if self.use_qk_norm:
             self.q_norm = RMSnorm(hid_dim=self.head_dim)
@@ -373,10 +456,18 @@ class DCMHAttention(nn.Module):
             self.window_size = None if self.lidx % 2 == 1 else config.window_size 
         else:
             window_l = self.window_types[config.window_type]
+            # 基于window type 重新设定window size， lgll
             self.window_size = window_l[self.lidx % len(window_l)]
+        
 
         if not self.is_training:
             self._register_load_state_dict_pre_hook(self.load_hook)
+
+        self.flag = 0
+        if self.window_size is None:
+            self.seq_length = min(config.block_size, 4096)
+        else:
+            self.seq_length = min(2 * self.window_size, config.block_size) # lsp  ####再看一下
 
     def load_hook(self, state_dict, prefix, *args):
         if prefix + "wq.weight" in state_dict:
@@ -385,7 +476,7 @@ class DCMHAttention(nn.Module):
             wv = state_dict.pop(prefix + "wv.weight")
             state_dict[prefix + "wqkv.weight"] = torch.cat([wq, wk, wv])
    
-    def _generate_fast(self, x, input_pos, q, k, v, k_mask):
+    def _generate_fast(self, x, input_pos, q, k, v, k_mask, batch_indexes, count=None):
         B,T,D = x.shape
         N,I = self.n_head, self.dyn_w_proj.dynamic_hidden_dim # 32, 2
         dw_hidden, dd = (x @ self.dyn_w_proj.dw_m).split([2*2*N*(2*I), 2*2*N*1], -1) # BTD, D(4K+4N) -> BT(4K+4N) -> BT(4K), BT(4N)
@@ -403,7 +494,7 @@ class DCMHAttention(nn.Module):
             qw, kw_new = qkw.unbind(3) # BS{pre/post}{q/k}NM -> BS{pre/post}NM * 2
             kw_new = kw_new + self.dyn_w_proj.sw  # BS2NM + 2NM-> BS2NM 
         if self.kv_cache is not None:
-            k, v, kw_out = self.kv_cache.update(input_pos, k, v, kw_val=kw_new) #BNT2M
+            k, v, kw_out, kw_sub_out = self.kv_cache.update(input_pos, values=(k, v, kw_new, None), batch_indexes=batch_indexes, count=count) #BNT2M
         logits = q @ k.transpose(-2, -1) * self.scale_factor 
         if self.query_wise:
             w = qw  # B12NM
@@ -411,15 +502,16 @@ class DCMHAttention(nn.Module):
             w = qw + kw_out # B12NM,BS2NM -> BS2NM 
         wl, w = w.permute(0,2,3,4,1).unbind(1)  # BS2NM->B2NMS->[BNMS]*2 
         logits = (logits * wl).sum(1).unsqueeze(2) # BN1S, BNMS -> BNMS-> BMS-> BM1S 
-        min_value = torch.finfo(torch.float16).min
+        min_value = torch.finfo(self.torch_dtype).min
         logits = torch.where(k_mask, logits, min_value)
         probs = logits.softmax(-1)
         probs = (probs * w).sum(1).unsqueeze(2)
         y = probs @ v
         return y
 
-    def forward(self, x: Tensor, freqs_cis: Tensor, mask: Tensor, input_pos: Optional[Tensor] = None, fast_infer=True, gen_mask=None) -> Tensor:
+    def forward(self, x: Tensor, freqs_cis: Tensor, mask: Tensor, input_pos: Optional[Tensor] = None, fast_infer=True, gen_mask=None, batch_indexes=None, count=None) -> Tensor:
         bsz, seqlen, _ = x.shape
+        # __import__("ipdb").set_trace()
 
         kv_size = self.n_local_heads * self.head_dim
         q, k, v = self.wqkv(x).split([self.dim, kv_size, kv_size], dim=-1)
@@ -435,6 +527,7 @@ class DCMHAttention(nn.Module):
         k = apply_rotary_emb(k, freqs_cis)
 
         q, k, v = map(lambda x: x.transpose(1, 2), (q, k, v)) # BNSD
+        # if self.lidx ==0: print('qk', q.var(), k.var())
 
         if self.is_training:
             N, D, I = self.n_head, self.head_dim, self.dyn_w_proj.dynamic_hidden_dim; # 6.7B
@@ -443,26 +536,31 @@ class DCMHAttention(nn.Module):
                 project_logits = True 
                 project_probs = True
                 if project_probs:
-                    dw_hidden, dd = (x @ self.dyn_w_proj.dw_m).split([2*2*N*(2*I), 2*2*N*1], -1)
+                    dw_hidden, dd = (x @ self.dyn_w_proj.dw_m).split([2*2*N*(2*I), 2*2*N*1], -1) #[2, 1024, 512],     [2, 1024, 128]
                     dw_hidden = self.dyn_w_proj.dw_hidden_activation(dw_hidden) 
                     dw_hidden = dw_hidden.view(dw_hidden.shape[:2]+(4,-1)) #B T (4 K) -> B T 4 K  # reshape
-                    dw = torch.einsum('B T C K, C K D -> B T C D', dw_hidden, self.dyn_w_proj.qkw_m) # BT4K,4K(MI)->BT4(MI)
+                    dw = torch.einsum('B T C K, C K D -> B T C D', dw_hidden, self.dyn_w_proj.qkw_m) # BT4K,4K(MI)->BT4(MI) #torch.Size([2, 1024, 4, 128])
                     shape = (B,T,2*2,-1,N)# if project_logits else (B,T,2,N,-1)  # BT(pre/post)(q/k)IN
-                    w1, w2 = dw.view(shape).split(I,-2)
+                    w1, w2 = dw.view(shape).split(I,-2) #沿着倒数第二个维度（即 -2 维度）分割成多个子张量，每个子张量的大小为I;  w1.shape: torch.Size([2, 1024, 4, 2, 32])
                     w1 = self.dyn_w_proj.dw1_norm(w1) # BT22IN
                     if self.use_sw:
                         pre_sw, post_sw = self.dyn_w_proj.sw.unbind(0)
                     else:
                         pre_sw, post_sw = None, None
-                    pre_qw1, pre_kw1, post_qw1, post_kw1 = w1.unbind(2)  # BT(2{*2})IN->[BTIN]*4
+                    pre_qw1, pre_kw1, post_qw1, post_kw1 = w1.unbind(2)  # BT(2{*2})IN->[BTIN]*4       pre_qw1.shape: torch.Size([2, 1024, 2, 32])
                     pre_qw2, pre_kw2, post_qw2, post_kw2 = w2.unbind(2)
-                    qkdd = F.tanh(dd).squeeze(-1).view(shape[:-2] + (N,)) # BT(2{*2})N1->BT(2{*2})N
-                    pre_qdd, pre_kdd, post_qdd, post_kdd = qkdd.unbind(2)  # BT(2{*2})N->[BTN]*4
+                    qkdd = F.tanh(dd).squeeze(-1).view(shape[:-2] + (N,)) # BT(2{*2})N1->BT(2{*2})N     qkdd.shape: [2, 1024, 4, 32]
+                    pre_qdd, pre_kdd, post_qdd, post_kdd = qkdd.unbind(2)  # BT(2{*2})N->[BTN]*4        pre_kdd.shape [2, 1024, 32]
 
-                y = torch.zeros(B, N, T, D).to(q.device, dtype=torch.float16)
+                y = torch.zeros(B, N, T, D).to(q.device, dtype=self.torch_dtype)
+                window_size = x.shape[-1] if self.window_size is None else self.window_size
+
                 for i in range(T // self.q_chunk_size):
                     start, stop = i * self.q_chunk_size, (i + 1) * self.q_chunk_size
-                    kv_start = max(0, stop - self.q_chunk_size -self.window_size)
+                    # stop = min(stop, T)
+ 
+                    kv_start = max(0, stop - self.q_chunk_size - window_size) 
+
                     _q = q[:, :, start : stop, :]
                     _k, _v = k[:, :, kv_start : stop, :], v[:, :, kv_start : stop, :]
                     _atten_mask = mask[:, :, start : stop, kv_start : stop]
@@ -470,24 +568,25 @@ class DCMHAttention(nn.Module):
                         if project_logits else None
                     _post_proj_dw_args = slice_dw(post_sw, post_qw1, post_qw2, post_kw1, post_kw2, post_qdd, post_kdd, start,stop,kv_start) \
                         if project_probs else None
-                    _o = _atten_context(_q, _k, _v, _atten_mask, _pre_proj_dw_args, _post_proj_dw_args)
+                    _o = _atten_context(_q, _k, _v, _atten_mask, _pre_proj_dw_args, _post_proj_dw_args, dtype=self.torch_dtype)
                     y[:,:,start:stop] = _o
             else:
-                y = torch.zeros(B, N, T, D).to(q.device, dtype=torch.float16)
+                window_size = x.shape[-1] if self.window_size is None else self.window_size  
+                y = torch.zeros(B, N, T, D).to(q.device, dtype=self.torch_dtype)
                 for i in range(T // self.q_chunk_size):
                     start, stop = i * self.q_chunk_size, (i + 1) * self.q_chunk_size
-                    kv_start = max(0, stop - self.q_chunk_size -self.window_size)
+                    kv_start = max(0, stop - self.q_chunk_size - window_size)
                     _q = q[:, :, start : stop, :]
                     _k, _v = k[:, :, kv_start : stop, :], v[:, :, kv_start : stop, :]
                     _atten_mask = mask[:, :, start : stop, kv_start : stop]
                     _pre_proj_dw_args, _post_proj_dw_args = None, None
-                    _o = _atten_context(_q, _k, _v, _atten_mask, _pre_proj_dw_args, _post_proj_dw_args)
+                    _o = _atten_context(_q, _k, _v, _atten_mask, _pre_proj_dw_args, _post_proj_dw_args, dtype=self.torch_dtype)
                     y[:,:,start:stop] = _o
         else: # inference
             if seqlen == 1: # one-token generation
-                k_mask = mask if self.window_size is None else gen_mask[:, :, :,:self.kv_cache.seq_length] 
+                k_mask = mask if self.window_size is None else gen_mask[:, :, :, :self.seq_length]
                 if fast_infer:
-                    y = self._generate_fast(x, input_pos, q, k, v, k_mask)
+                    y = self._generate_fast(x, input_pos, q, k, v, k_mask, batch_indexes=batch_indexes, count=count)
                 else: 
                     assert not self.query_wise
                     # generate dw from hidden_state
@@ -496,7 +595,7 @@ class DCMHAttention(nn.Module):
                     # update kvkw cache
                     kw_new = kw_new + self.dyn_w_proj.sw # absorb residual or sw into kw cache
                     if self.kv_cache is not None:
-                        k, v, kw_out = self.kv_cache.update(input_pos, k, v, kw_val=kw_new) # BNSD, BNSD, BS2NN
+                        k, v, kw_out, _ =self.kv_cache.update(input_pos, values=(k, v, kw_new, None), batch_indexes=batch_indexes) # BNSD, BNSD, BS2NN
 
                     logits = q @ k.transpose(-2, -1) * self.scale_factor
                     # merge pre_w and apply it
@@ -505,7 +604,7 @@ class DCMHAttention(nn.Module):
                     pre_w = pre_qw + kw_out[:,:,0] # B1NM, BSNM -> BSNM
                     logits = self.dyn_w_proj.pre_proj(logits, proj_w=pre_w.squeeze(1))
   
-                    logits = torch.where(k_mask, logits, torch.finfo(torch.float16).min)
+                    logits = torch.where(k_mask, logits, torch.finfo(self.torch_dtype).min)
                     probs = logits.softmax(-1)
 
                     # merge post_w and apply it
@@ -513,23 +612,43 @@ class DCMHAttention(nn.Module):
                     post_qw = torch.einsum('BTGIN, BTGIM->BTNM', post_qw1, post_qw2) + torch.diag_embed(post_qdd.squeeze(2))
                     post_w = post_qw + kw_out[:,:,1]
                     probs = self.dyn_w_proj.post_proj(probs, proj_w=post_w.squeeze(1)) 
-
+                    
                     y = probs @ v                  
             else: # prefill
-                k_mask = mask[:,:,:,:k.shape[-2]] 
+                # __import__("ipdb").set_trace()
                 pre_proj_dw_args, post_proj_dw_args,kw_new = self.dyn_w_proj(x, gen_cache=True)
                 kw_new = kw_new + self.dyn_w_proj.sw # absorb residual or sw into kw cache
+                # concat kw_sub
+                (pre_qw1, pre_qw2, pre_kw1, pre_kw2, pre_qdd, pre_kdd) = pre_proj_dw_args  # BTGIM
+                (post_qw1, post_qw2, post_kw1, post_kw2, post_qdd, post_kdd) = post_proj_dw_args
+                kdd = torch.cat([pre_kdd, post_kdd], dim=2).unsqueeze(2) # BTGN -> BT12N
+                kw_sub = torch.cat([pre_kw1, pre_kw2, post_kw1, post_kw2, kdd], dim=2) # BT42N 
                 if self.kv_cache is not None:
-                    self.kv_cache.update(input_pos, k, v, kw_val=kw_new) # BNSD, BNSD, BS2NN
+                    k, v, kw_out, kw_sub_out = self.kv_cache.update(input_pos, values=(k, v, kw_new, kw_sub), batch_indexes=batch_indexes, count=count)
+
+                k_mask = mask[:,:,:,:k.shape[-2]]
+                
+                # update dw args
+                pre_kw1, pre_kw2, post_kw1, post_kw2, kdd = torch.split(kw_sub_out, 1, dim=2) # split func is keep dim. BT52N -> [BT12N] * 5
+                pre_kdd, post_kdd = torch.split(kdd.squeeze(2), 1, dim=2) # BT2N -> [BT1N] * 2
+
+                pre_proj_dw_args = (pre_qw1, pre_qw2, pre_kw1, pre_kw2, pre_qdd, pre_kdd)
+                post_proj_dw_args = (post_qw1, post_qw2, post_kw1, post_kw2, post_qdd, post_kdd)
+
                 logits = q @ k.transpose(-2, -1) * self.scale_factor 
                 logits = self.dyn_w_proj.pre_proj(logits, dws=pre_proj_dw_args, query_vec=x, key_vec=x, fast_infer=True)  # XD BN1S
-                logits = torch.where(k_mask, logits, torch.finfo(torch.float16).min)
+                logits = torch.where(k_mask, logits, torch.finfo(self.torch_dtype).min) # lsp: float16 -> float32
                 probs = logits.softmax(-1)
+    #            probs = probs.to(torch.bfloat16) # lsp: add
                 probs = self.dyn_w_proj.post_proj(probs, dws=post_proj_dw_args, query_vec=x, key_vec=x, fast_infer=True) # BN1S
+                # if self.lidx ==0: print('logits_after_post', logits.var())
+   #             probs *= k_mask # lsp: add
                 y = probs @ v
 
         y = y.transpose(1, 2).contiguous().view(bsz, seqlen, self.dim)
+
         y = self.wo(y)
+
         return y
 
 
@@ -539,10 +658,32 @@ class FeedForward(nn.Module):
         self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
         self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
         self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
+        self.mgate = config.mgate
+        if self.mgate:
+            self.mgate_dim = config.mgate_dim
+            self.mg = nn.Linear(config.dim, config.mgate_dim, bias=False)
+
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+        if self.mgate:
+            #gate_scores = F.silu(self.mgate_layer(x)) # BTD,DE->BTE
+            gate_scores = self.mg(x) # BTD,DE->BTE
+            gate_scores = gate_scores.to(dtype=torch.float32).softmax(-1).to(dtype=x.dtype)  #确认过了。
+            # gate_scores = gate_scores.to(dtype=torch.float32).softmax(-1).to(dtype=x.dtype)
+            activations = F.silu(self.w1(x)) * self.w3(x)
 
+            B, T, D = activations.shape
+            ## blem
+            #print('act', activations.var())
+            activations = activations.reshape(B, T, self.mgate_dim, D // self.mgate_dim)
+            gate_activations = torch.einsum('BTE,BTEM->BTEM', gate_scores, activations)
+            gate_activations = gate_activations.reshape(B, T, D)
+            #print('gate act', gate_activations.shape, gate_activations.var())
+            out = self.w2(gate_activations)
+            #print('mlp out', out.var())
+        else:
+            out = self.w2(F.silu(self.w1(x)) * self.w3(x))
+        return out
 
 class RMSNorm(nn.Module):
     def __init__(self, dim: int, eps: float = 1e-5):
@@ -558,12 +699,18 @@ class RMSNorm(nn.Module):
         return output * self.weight
 
 
-def _atten_context(query, key, value, atten_mask, pre_proj_dw_args, post_proj_dw_args):
-    logits = query @ key.transpose(-2, -1)
-    if pre_proj_dw_args is not None: logits = _cross_head_proj(logits, *pre_proj_dw_args)
-    logits = torch.where(atten_mask, logits, torch.finfo(torch.float16).min)
+def _atten_context(query, key, value, atten_mask, pre_proj_dw_args, post_proj_dw_args, dtype=torch.bfloat16):
+    # __import__("ipdb").set_trace()
+    logits = query @ key.transpose(-2, -1) 
+
+    if pre_proj_dw_args is not None: logits = _cross_head_proj(logits, *pre_proj_dw_args)   #
+
+    logits = torch.where(atten_mask, logits, torch.finfo(dtype).min)
+    logits = logits.to(torch.float32)   ##特别注意这一行：新添加的。
     probs = logits.softmax(-1)
+    probs = probs.to(torch.bfloat16)
     if post_proj_dw_args is not None: probs = _cross_head_proj(probs, *post_proj_dw_args)
+    
     o = probs @ value  # BNTS,BNSD->BNTD
     return o
 
@@ -601,14 +748,14 @@ def slice_dw(sw, qw1, qw2, kw1, kw2, qdd, kdd, start, stop, kv_start):
             kdd[:, kv_start : stop] if kdd is not None else None)
 
 def precompute_freqs_cis(
-    seq_len: int, n_elem: int, base: int = 10000
+    seq_len: int, n_elem: int, base: int = 10000, dtype = torch.float16
 ) -> Tensor:
     freqs = 1.0 / (base ** (torch.arange(0, n_elem, 2)[: (n_elem // 2)].float() / n_elem))
     t = torch.arange(seq_len, device=freqs.device)
     freqs = torch.outer(t, freqs)
     freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
     cache = torch.stack([freqs_cis.real, freqs_cis.imag], dim=-1)
-    return cache.to(dtype=torch.float16)
+    return cache.to(dtype=dtype)
 
 def unbind(ary, n, dim=0):
     return [torch.squeeze(a, dim=dim) for a in torch.split(ary, ary.shape[dim] // n, dim=dim)]
@@ -628,3 +775,50 @@ def apply_rotary_emb(x: Tensor, freqs_cis: Tensor, mode='half') -> Tensor:
     )
     x_out2 = x_out2.flatten(3)
     return x_out2.type_as(x)
+
+def match_weight(model, w):
+    map_dict={'q_proj':'query', 'k_proj':'key', 'v_proj':'value','wo':'post', 'w1': 'ffn_layer1_gate', 'w3': 'ffn_layer1', 'w2': 'ffn_layer2',
+              'weight': 'w', 'mg': 'mgate_layer'} # 'pre_proj': 'pre_proj', 'post_proj': 'post_proj'
+    _, E, H, D = w['state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_0.self_attention.key.w'].shape # (16, 2560, 32, 80)
+    N = w['state.mdl_vars.params.lm.embedding_lookup.emb_var'].shape[0] #50304
+    state_dict = {}
+    vocab_size = 152064
+    num_blocks = 4 # 2
+    for k, v in model.named_parameters():
+        if k == 'tok_embeddings.weight':
+            v = w['state.mdl_vars.params.lm.embedding_lookup.emb_var'][:vocab_size,:]
+        elif k == 'norm.weight':
+            v = w['state.mdl_vars.params.lm.final_ln.scale']
+        elif k == 'output.weight':
+            v = w['state.mdl_vars.params.lm.softmax.logits_ffn.linear.w'].T[:vocab_size,:]  # E,N -> N,E
+        else:
+            layer = int(k.split('.')[1])
+            sub_layer, _layer = layer % num_blocks, layer //num_blocks # sub_layer 0/1, _layer 0-15
+            if '.attention.' in k:
+                if k.endswith('_m'):continue # merged proj weights
+                _, _, _, ptype, wtype = k.split('.')
+                if k.endswith('_p'): continue # ablation parameters
+                if ptype in ['dyn_w_proj']: # pre post proj
+                    v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.{map_dict.get(ptype, ptype)}.{map_dict.get(wtype, wtype)}'][_layer]
+                elif ptype in ['q_norm', 'k_norm']:
+                    v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.{map_dict.get(ptype, ptype)}.{map_dict.get(wtype, wtype)}'][_layer]
+                elif ptype == 'wqkv':
+                    _q = torch.tensor(w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.query.w'][_layer]).reshape(E,E) # EHD->EE
+                    _k = torch.tensor(w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.key.w'][_layer]).reshape(E,E) # EHD->EE
+                    _v = torch.tensor(w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.value.w'][_layer]).reshape(E,E) # EHD->EE
+                    v = torch.cat([_q, _k, _v],dim=-1).T
+                else: # o
+                    v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.self_attention.{map_dict.get(ptype, ptype)}.{map_dict.get(wtype, wtype)}'][_layer].reshape(E,H*D)
+            elif 'feed_forward' in k:
+                ptype = k.split('.')[3] # w1, w3,w2,mgate_layer
+                v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.ff_layer.{map_dict[ptype]}.linear.w'][_layer].T
+            elif 'ffn_norm' in k: # mlp layernorm
+                v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.ff_layer.layer_norm.scale'][_layer]
+            elif 'attention_norm' in k: # attention layernorm
+                v = w[f'state.mdl_vars.params.lm.transformer.repeat.sub.x_layers_{sub_layer}.layer_norm.scale'][_layer]
+        # if 'norm.weight' in k:
+        #     v = v+1
+        state_dict[k] = torch.tensor(v)
+    model.load_state_dict(state_dict, strict=False)
+    return model
+
