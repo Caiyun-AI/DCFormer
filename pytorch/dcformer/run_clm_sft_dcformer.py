@@ -35,7 +35,7 @@ from transformers.utils import send_example_telemetry
 from transformers.utils.versions import require_version
 
 from configuration_dcformer import DCFormerConfig
-from modeling_dcformer_last_bf16_add_dtype_github import DCFormer
+from modeling_dcformer import DCFormer
 from safetensors.torch import load_file
 import re
 pattern = re.compile(r'\d+\.bin$')
