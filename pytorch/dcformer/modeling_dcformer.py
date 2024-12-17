@@ -554,10 +554,10 @@ class DCMHAttention(nn.Module):
 
                 y = torch.zeros(B, N, T, D).to(q.device, dtype=self.torch_dtype)
                 window_size = x.shape[-1] if self.window_size is None else self.window_size
-
-                for i in range(T // self.q_chunk_size):
+                q = q*self.scale_factor
+                for i in range(T // self.q_chunk_size + 1):
                     start, stop = i * self.q_chunk_size, (i + 1) * self.q_chunk_size
-                    # stop = min(stop, T)
+                    stop = min(stop, T)
  
                     kv_start = max(0, stop - self.q_chunk_size - window_size) 
 
