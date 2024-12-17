@@ -104,6 +104,30 @@ class DCFormer(PreTrainedModel):
 
         # lsp: 最大的kv cache长度为4096.不管是global还是local window
         self.cache_length = min(config.block_size, 4096) if config.prefill_pad else config.block_size
+        
+        self.post_init()
+
+    
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.xavier_uniform_(module.weight)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            std = 1 / math.sqrt(self.config.dim)
+            module.weight.data.normal_(mean=0.0, std=std)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+    
+    def post_init(self):
+        """
+        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
+        modules properly initialized (such as weight initialization).
+        """
+
+        self.init_weights()
+        std = 1 / math.sqrt(self.config.dim)
+        self.output.weight.data.normal_(mean=0.0, std=std)
 
     def setup_caches(self, max_batch_size,  set_kv_cache=True):
         head_dim = self.config.dim // self.config.n_head
