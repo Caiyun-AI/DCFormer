@@ -34,11 +34,6 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import send_example_telemetry
 from transformers.utils.versions import require_version
 
-from configuration_dcformer import DCFormerConfig
-from modeling_dcformer import DCFormer
-from safetensors.torch import load_file
-import re
-pattern = re.compile(r'\d+\.bin$')
 
 # import os
 # os.environ['TORCH_LOGS'] = "+dynamo"
@@ -61,28 +56,6 @@ def compile_model(
     for m in reversed(list(model.modules())):
         m.compile(backend=backend)
 
-
-def load_dcformer(checkpoint_path, config=None, device='cpu',  batch_size=1):
-
-    dcformer = DCFormer(config)
-
-    state_dict = {}
-
-    for filename in os.listdir(checkpoint_path):
-        # print(f)
-        if filename.endswith('model.bin') or pattern.search(filename):
-            file_path = os.path.join(checkpoint_path, filename)
-            state_dict.update(torch.load(file_path))
-        elif filename.endswith('.safetensors'):
-            file_path = os.path.join(checkpoint_path, filename)
-            state_dict.update(load_file(file_path))
-
-    dcformer.load_state_dict(state_dict, strict=False)
-
-    dcformer = dcformer.to(device)
-
-    dcformer.setup_caches(max_batch_size=batch_size)
-    return dcformer
 
 @dataclass
 class ModelArguments:
@@ -264,7 +237,11 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    config = DCFormerConfig.from_pretrained(model_args.model_name_or_path)
+
+    if model_args.config_name:
+        config = AutoConfig.from_pretrained(model_args.config_name, trust_remote_code=True)
+    elif model_args.model_name_or_path:
+        config = AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
 
     if training_args.small:
         config.n_layer = 8
@@ -320,8 +297,28 @@ def main():
         logger.info(tokenizer.decode(eval_dataset[0]['input_ids']))
 
 
-
-    model = load_dcformer(model_args.model_name_or_path, config=config, device=training_args.device, batch_size=training_args.per_device_train_batch_size)
+    torch_dtype = (
+            model_args.torch_dtype
+            if model_args.torch_dtype in ["auto", None]
+            else getattr(torch, model_args.torch_dtype)
+        )
+      
+    if model_args.model_name_or_path:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            torch_dtype=torch_dtype,
+            trust_remote_code=True,
+        ) 
+    else:
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True, torch_dtype=torch_dtype)
+        n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
+        logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+    
+    
+    model = model.to(training_args.device)
+        
+    model.setup_caches(max_batch_size=training_args.per_device_train_batch_size)
 
     if training_args.compile:
         compile_model(model)
