@@ -166,11 +166,7 @@ class DCFormer(PreTrainedModel):
 
             _local_mask = make_window_mask(window_size * 2, window_size - 1).bool() # -1 的时候加自身的关注长度为window_size
             ms = []
-            print("1111223")
-            print(max_seq_length // window_size - 2)
-            print(_local_mask)
-            print(window_size)
-            print("fgjksdfhsklf....")
+
             for i in range(max_seq_length // window_size - 2):
                 _m = torch.roll(_local_mask[window_size:].clone(), shifts=(i + 1) * window_size, dims=1)
                 ms.append(_m)
