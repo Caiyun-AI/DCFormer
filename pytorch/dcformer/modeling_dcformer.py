@@ -170,7 +170,7 @@ class DCFormer(PreTrainedModel):
             for i in range(max_seq_length // window_size - 2):
                 _m = torch.roll(_local_mask[window_size:].clone(), shifts=(i + 1) * window_size, dims=1)
                 ms.append(_m)
-            print(ms)
+            # print(ms)
             ms = torch.cat(ms, dim=0)
             local_mask = torch.cat([_local_mask, ms], dim=0)
 
