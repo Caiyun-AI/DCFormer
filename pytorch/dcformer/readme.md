@@ -1,10 +1,17 @@
 <img src="https://github.com/Caiyun-AI/DCFormer/blob/lbb/pytorch/dcformer/img/dcformer%E5%92%8Cllama3%E5%8D%95%E6%AD%A5%E8%BF%90%E8%A1%8C%E6%97%B6%E9%97%B4%E5%AF%B9%E6%AF%94.png" width="2000">
 
 
-## train script
+## pretrain script
 
 bash run_pt.sh
 
 ## sft script
 
 bash run_sft.sh
+
+## env
+
+torch=2.5.1
+deepspeed=0.16.0
+transformers=4.46.3
+accelerate=1.1.1
