@@ -1,19 +1,21 @@
 lr=1e-4
 
+
 pretrained_model=/home/pretrained_models/your_model_path
 chinese_tokenizer_path=/home/your_tokenizer_path
+#if not use model_name_or_path, please use config_name,choose one from the two parameters.
+config_name=/home/your_config_path
+
 dataset_dir=./dataset_dir
-per_device_train_batch_size=1
+per_device_train_batch_size=2
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 output_dir=./output_dir
-
 validation_file=dataset_dir/CoT_data.json
-
-# deepspeed_config_file=ds_zero0.json
+# deepspeed_config_file=ds_zero1.json
 deepspeed_config_file=ds_zero2_no_offload.json
 
-torchrun --nnodes 1 --nproc_per_node 2 run_clm_sft_with_peft.py \
+torchrun --nnodes 1 --nproc_per_node 2 run_clm_sft_dcformer.py \
     --deepspeed ${deepspeed_config_file} \
     --model_name_or_path ${pretrained_model} \
     --tokenizer_name_or_path ${chinese_tokenizer_path} \
@@ -51,4 +53,4 @@ torchrun --nnodes 1 --nproc_per_node 2 run_clm_sft_with_peft.py \
     --remove_unused_columns True  \
     --q_chunk_size 128 \
     --small True \
-    --compile True 
+    --compile False 
