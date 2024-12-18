@@ -104,10 +104,9 @@ class DCFormer(PreTrainedModel):
 
         # lsp: 最大的kv cache长度为4096.不管是global还是local window
         self.cache_length = min(config.block_size, 4096) if config.prefill_pad else config.block_size
-        
+
         self.post_init()
 
-    
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
             torch.nn.init.xavier_uniform_(module.weight)
@@ -295,8 +294,9 @@ class DCFormerBlock(nn.Module):
 
 class DynamicWeightProjection(nn.Module):
     
-    def __init__(self, num_heads=32, num_groups=1, residual=True, query_input_dim=4096, dynamic_squeeze_ratio=16, dynamic_w_hidden_dim=128,dtype=torch.bfloat16,use_sw=False):
+    def __init__(self, config, num_heads=32, num_groups=1, residual=True, query_input_dim=4096, dynamic_squeeze_ratio=16, dynamic_w_hidden_dim=128,dtype=torch.bfloat16,use_sw=False):
         super().__init__()
+        self.config = config
         self.num_heads = num_heads 
         self.num_groups = num_groups 
         self.query_input_dim = query_input_dim 
@@ -312,11 +312,17 @@ class DynamicWeightProjection(nn.Module):
 
         dynamic_hidden_dim = self.num_heads_per_group // self.dynamic_squeeze_ratio 
         self.dynamic_hidden_dim = dynamic_hidden_dim 
-        self.dw1 = nn.parameter.Parameter(torch.zeros(self.query_input_dim, self.num_groups, 4, self.dynamic_w_hidden_dim, dtype=dtype)) #(4096, 1, 4, 128)
+
+        rank = 2
+        qkw_std = 0.02 / (math.sqrt(2*self.num_heads*rank) * (self.num_heads + rank))
+        dd_std = 0.05 * math.sqrt(2/(self.num_heads + self.config.dim)) 
+        dw1_std = math.sqrt(2/(self.config.dim+self.dynamic_w_hidden_dim))
+
+        self.dw1 = nn.parameter.Parameter(torch.zeros(self.query_input_dim, self.num_groups, 4, self.dynamic_w_hidden_dim, dtype=dtype).normal_(mean=0,std=dw1_std)) #(4096, 1, 4, 128)
         G, K, M = self.num_groups, self.dynamic_w_hidden_dim, self.num_heads_per_group
         I = dynamic_hidden_dim * 2 
-        self.qkw = nn.parameter.Parameter(torch.zeros([G, 4, K, I, M], dtype=dtype)) # (1, 4, 128, 4, 32)
-        self.dd = nn.parameter.Parameter(torch.zeros(self.query_input_dim, self.num_groups, self.num_heads_per_group * 4, dtype=dtype)) #  (4096, 1, 128)
+        self.qkw = nn.parameter.Parameter(torch.zeros([G, 4, K, I, M], dtype=dtype).normal_(mean=0,std=qkw_std)) # (1, 4, 128, 4, 32)
+        self.dd = nn.parameter.Parameter(torch.zeros(self.query_input_dim, self.num_groups, self.num_heads_per_group * 4, dtype=dtype).normal_(mean=0,std=dd_std)) #  (4096, 1, 128)
 
         self.merge_weights()
 
@@ -463,7 +469,7 @@ class DCMHAttention(nn.Module):
         self.torch_dtype = extract_dtype_callable(config.torch_dtype)
 
         # self.torch_dtype = torch.bfloat16
-        self.dyn_w_proj = DynamicWeightProjection(num_heads=self.n_head, query_input_dim=config.dim, dynamic_squeeze_ratio=self.n_head//2, dynamic_w_hidden_dim=self.n_head*4, dtype=self.torch_dtype, use_sw=use_sw)
+        self.dyn_w_proj = DynamicWeightProjection(config, num_heads=self.n_head, query_input_dim=config.dim, dynamic_squeeze_ratio=self.n_head//2, dynamic_w_hidden_dim=self.n_head*4, dtype=self.torch_dtype, use_sw=use_sw)
         self.use_qk_norm = config.use_qk_norm 
         if self.use_qk_norm:
             self.q_norm = RMSnorm(hid_dim=self.head_dim)
