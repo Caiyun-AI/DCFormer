@@ -1,15 +1,16 @@
 lr=2e-5
 
-
 pretrained_model=/home/pretrained_models/your_model_path
 chinese_tokenizer_path=/home/your_tokenizer_path
+#if not use model_name_or_path, please use config_name,choose one from the two parameters.
+config_name=/home/your_config_path
 
 dataset_dir=./data_dir
 data_cache=./data_cache_dir_xm_1024
 per_device_train_batch_size=1
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
-output_dir=./output_dir
+output_dir=./output_dir_1
 
 deepspeed_config_file=ds_zero2_no_offload.json
 
@@ -52,7 +53,7 @@ torchrun --nnodes 1 --nproc_per_node 2 run_clm_pt_dcformer.py \
     --remove_unused_columns True  \
     --q_chunk_size 128 \
     --small True \
-    --compile True \
+    --compile  False \
     --max_train_samples 40 \
     --max_eval_samples 20 
 
