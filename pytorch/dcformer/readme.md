@@ -9,9 +9,13 @@ bash run_sft.sh
 ## env
 
 torch=2.5.1
+
 deepspeed=0.16.0
+
 transformers=4.46.3
+
 accelerate=1.1.1
+
 
 
 ## dcformer7b和llama3-7b运行单个step测试速度对比
