@@ -2,7 +2,7 @@
 
 bash run_pt.sh
 
-## sft script
+## fine-tune script
 
 bash run_sft.sh
 
