@@ -37,7 +37,7 @@ Llama3(1024+not_FlashAttention+compile) indicates that the text context length o
 
 
 
-This table presents the time taken, in seconds, for DCFormer-8B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 1024.
+This table presents the time taken, in seconds, for DCFormer-8B and Llama3-8B to execute a single step under various model configurations and settings, with a sequence length of 1024.
 
 | model  | batch_size=18 | batch_size=20 | batch_size=24 | batch_size=26 | batch_size=28 | batch_size=30 |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
