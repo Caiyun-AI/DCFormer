@@ -1,12 +1,12 @@
-## pretrain script
+## pre-training script
 
 bash run_pt.sh
 
-## fine-tune script
+## supervised fine-tuning script
 
 bash run_sft.sh
 
-## env
+## conda env
 
 torch=2.5.1
 
