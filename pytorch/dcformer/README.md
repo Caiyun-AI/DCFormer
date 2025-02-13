@@ -27,13 +27,14 @@ DCFormer (1024+not_compile) indicates that the text context length of DCFormer-7
 
 DCFormer(1024+compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is used.
 
-Llama3(1024+flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is not used.
+Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is not used.
 
-Llama3(1024+not_flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is not used.
+Llama3(1024+not_FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is not used.
 
-Llama3(1024+flashattention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is used.
+Llama3(1024+FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is used.
 
-Llama3(1024+not_flashattention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is used.
+Llama3(1024+not_FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is used.
+
 
 
 This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 1024.
@@ -42,10 +43,10 @@ This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
 | DCFormer(1024+not_compile)  | 34.117078  | 37.062407  | 44.023241  | 47.245348  | 50.583633  | OOM  |
 | DCFormer(1024+compile)  | 8.85703  | 9.354807  | 10.424255  | 10.774785  | 11.618008  | 12.062406  |
-| Llama3(1024+flashattention+not_compile)  | 9.034925  | OOM  | OOM  | OOM  | OOM  | OOM  |
-| Llama3(1024+not_flashattention+not_compile)  | 9.084844  | OOM  | OOM  | OOM  | OOM  | OOM  |
-| Llama3(1024+flashattention+compile)  | 8.354234  | 8.520253  | 8.727508  | 8.875685  | 9.15617  | 9.414761  |
-| Llama3(1024+not_flashattention+compile)  | 10.627787  | 11.019346  | 11.677852  | 12.094193  | 12.400657  | 12.730574  |
+| Llama3(1024+FlashAttention+not_compile)  | 9.034925  | OOM  | OOM  | OOM  | OOM  | OOM  |
+| Llama3(1024+not_FlashAttention+not_compile)  | 9.084844  | OOM  | OOM  | OOM  | OOM  | OOM  |
+| Llama3(1024+FlashAttention+compile)  | 8.354234  | 8.520253  | 8.727508  | 8.875685  | 9.15617  | 9.414761  |
+| Llama3(1024+not_FlashAttention+compile)  | 10.627787  | 11.019346  | 11.677852  | 12.094193  | 12.400657  | 12.730574  |
 
 
 ### when a sequence length is 4096
@@ -54,13 +55,14 @@ DCFormer (4096+not_compile) indicates that the text context length of DCFormer-7
 
 DCFormer(4096+compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is used.
 
-Llama3(4096+flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is not used.
+Llama3(4096+FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is not used.
 
-Llama3(4096+not_flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is not used.
+Llama3(4096+not_FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is not used.
 
-Llama3(4096+flashattention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is used.
+Llama3(4096+FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is used.
 
-Llama3(4096+not_flashattention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is used.
+Llama3(4096+not_FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is used.
+
 
 
 This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 4096.
@@ -70,7 +72,7 @@ This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to
 | ------------- | ------------- | ------------- | ------------- |
 | DCFormer(4096+not_compile)  | 44.092943  | 62.446753  | OOM  |
 | DCFormer(4096+compile)  | 10.559626  | 13.794642  | OOM  |
-| Llama3(4096+flashattention+not_compile)  | 8.504642  | OOM  | OOM  |
-| Llama3(4096+not_flashattention+not_compile)  | 8.557134  | OOM  | OOM  |
-| Llama3(4096+flashattention+compile)  | 8.280823  | 8.908348  | 10.217685  |
-| Llama3(4096+not_flashattention+compile)  | 11.566628  | 13.628004  | 15.812723  |
+| Llama3(4096+FlashAttention+not_compile)  | 8.504642  | OOM  | OOM  |
+| Llama3(4096+not_FlashAttention+not_compile)  | 8.557134  | OOM  | OOM  |
+| Llama3(4096+FlashAttention+compile)  | 8.280823  | 8.908348  | 10.217685  |
+| Llama3(4096+not_FlashAttention+compile)  | 11.566628  | 13.628004  | 15.812723  |
