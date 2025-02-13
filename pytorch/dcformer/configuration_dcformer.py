@@ -24,7 +24,8 @@ class DCFormerConfig(PretrainedConfig):
         intermediate_size: int = None,
         n_local_heads: int = -1,
         head_dim: int = 64,
-        rope_base: float = 10000,
+        #rope_base: float = 10000,
+        rope_base: float = 500000,
         norm_eps: float = 1e-5,
         use_gradient_checkpointing: bool = False,
         is_training: bool = False,
@@ -38,6 +39,9 @@ class DCFormerConfig(PretrainedConfig):
         bos_token_id: int =1,
         eos_token_id: int =2,
         tie_word_embeddings: bool =False,
+        mgate: bool = False,
+        mgate_dim: int= 44,
+        prefill_pad: bool = True,
         **kwargs,
     ):
         self.block_size=block_size
@@ -58,6 +62,9 @@ class DCFormerConfig(PretrainedConfig):
         self.window_size=window_size
         self.window_type=window_type
         self.query_wise=query_wise
+        self.mgate=mgate
+        self.mgate_dim=mgate_dim
+        self.prefill_pad=prefill_pad
         # post init
         if self.n_local_heads == -1:
             self.n_local_heads = self.n_head
