@@ -23,3 +23,9 @@ accelerate=1.1.1
 <img src="https://github.com/Caiyun-AI/DCFormer/blob/lbb/pytorch/dcformer/img/dcformer%E5%92%8Cllama3%E5%8D%95%E6%AD%A5%E8%BF%90%E8%A1%8C%E6%97%B6%E9%97%B4%E5%AF%B9%E6%AF%94.png" width="2000">
 
 
+   “`
+   | 列1   | 列2   | 列3   |
+   | —– | —– | —– |
+   | 内容1 | 内容2 | 内容3 |
+   | 内容4 | 内容5 | 内容6 |
+   “`
