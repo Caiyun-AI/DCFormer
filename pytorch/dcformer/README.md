@@ -22,7 +22,7 @@ accelerate=1.1.1
 
 Compare the time taken to run a single step between DCFormer-7B and Llama3-7B when the context lengths are 1024 and 4096, respectively.
 
-### when a sequence length is 1024
+### when sequence length is 1024
 DCFormer (1024+not_compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is not used.
 
 DCFormer(1024+compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is used.
@@ -49,7 +49,7 @@ This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to
 | Llama3(1024+not_FlashAttention+compile)  | 10.627787  | 11.019346  | 11.677852  | 12.094193  | 12.400657  | 12.730574  |
 
 
-### when a sequence length is 4096
+### when sequence length is 4096
 
 DCFormer (4096+not_compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is not used.
 
