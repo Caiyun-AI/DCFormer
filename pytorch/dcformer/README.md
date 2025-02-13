@@ -18,14 +18,14 @@ accelerate=1.1.1
 
 
 
-## Compare the time taken to run a single step between DCFormer-7B and Llama3-7B.
+## Compare the time taken to run a single step between DCFormer-8B and Llama3-8B.
 
-Compare the time taken to run a single step between DCFormer-7B and Llama3-7B when the context lengths are 1024 and 4096, respectively.
+Compare the time taken to run a single step between DCFormer-8B and Llama3-7B when the context lengths are 1024 and 4096, respectively.
 
 ### when sequence length is 1024
-DCFormer (1024+not_compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is not used.
+DCFormer (1024+not_compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is not used.
 
-DCFormer(1024+compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is used.
+DCFormer(1024+compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is used.
 
 Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is not used.
 
@@ -37,7 +37,7 @@ Llama3(1024+not_FlashAttention+compile) indicates that the text context length o
 
 
 
-This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 1024.
+This table presents the time taken, in seconds, for DCFormer-8B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 1024.
 
 | model  | batch_size=18 | batch_size=20 | batch_size=24 | batch_size=26 | batch_size=28 | batch_size=30 |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
@@ -51,21 +51,21 @@ This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to
 
 ### when sequence length is 4096
 
-DCFormer (4096+not_compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is not used.
+DCFormer (4096+not_compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is not used.
 
-DCFormer(4096+compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is used.
+DCFormer(4096+compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is used.
 
-Llama3(4096+FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is not used.
+Llama3(4096+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is not used.
 
-Llama3(4096+not_FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is not used.
+Llama3(4096+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is not used.
 
-Llama3(4096+FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is used.
+Llama3(4096+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is used.
 
-Llama3(4096+not_FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is used.
+Llama3(4096+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is used.
 
 
 
-This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 4096.
+This table presents the time taken, in seconds, for DCFormer-8B and Llama3-8B to execute a single step under various model configurations and settings, with a sequence length of 4096.
 
 
 | model  | batch_size=4 | batch_size=6 | batch_size=8 |
