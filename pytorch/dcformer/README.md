@@ -18,10 +18,16 @@ accelerate=1.1.1
 
 
 
-## dcformer7b和llama3-7b运行单个step测试速度对比
+## Compare the time taken to run a single step between DCFormer-7B and Llama3-7B.
 
-<img src="https://github.com/Caiyun-AI/DCFormer/blob/lbb/pytorch/dcformer/img/dcformer%E5%92%8Cllama3%E5%8D%95%E6%AD%A5%E8%BF%90%E8%A1%8C%E6%97%B6%E9%97%B4%E5%AF%B9%E6%AF%94.png" width="2000">
+DCFormer (1024+not_compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is not used.
+DCFormer(1024+compile) indicates that the text context length of DCFormer-7B's training data is 1024, and torch compilation is used.
+Llama3(1024+flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is not used.
+Llama3(1024+not_flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is not used.
+Llama3(1024+flashattention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is used.
+Llama3(1024+not_flashattention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is used.
 
+This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 1024.
 
 | model  | batch_size=18 | batch_size=20 | batch_size=24 | batch_size=26 | batch_size=28 | batch_size=30 |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
@@ -32,6 +38,14 @@ accelerate=1.1.1
 | Llama3(1024+flashattention+compile)  | 8.354234  | 8.520253  | 8.727508  | 8.875685  | 9.15617  | 9.414761  |
 | Llama3(1024+not_flashattention+compile)  | 10.627787  | 11.019346  | 11.677852  | 12.094193  | 12.400657  | 12.730574  |
 
+DCFormer (4096+not_compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is not used.
+DCFormer(4096+compile) indicates that the text context length of DCFormer-7B's training data is 4096, and torch compilation is used.
+Llama3(4096+flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is not used.
+Llama3(4096+not_flashattention+not_compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is not used.
+Llama3(4096+flashattention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is used and torch compilation is used.
+Llama3(4096+not_flashattention+compile) indicates that the text context length of Llama3-7B's training data is 4096, FlashAttention is not used and torch compilation is used.
+
+This table presents the time taken, in seconds, for DCFormer-7B and Llama3-7B to execute a single step under various model configurations and settings, with a sequence length of 4096.
 
 
 | model  | batch_size=4 | batch_size=6 | batch_size=8 |
