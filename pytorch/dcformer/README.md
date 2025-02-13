@@ -21,7 +21,7 @@ accelerate=1.1.1
 ## Compare the time taken to run a single step between DCFormer-8B and Llama3-8B.
 
 Compare the time taken to run a single step between DCFormer-8B and Llama3-8B when the context lengths are 1024 and 4096, respectively.
-The following experiments were conducted using H800 GPU, each GPU has 80GB of VRAM, total 6 GPUs, and Deepspeed's ZeRO-2.
+The following experiments were conducted using H800 GPU, each GPU has 80GB of VRAM, 6 GPUs totally, and Deepspeed's ZeRO-2.
 
 ### when sequence length is 1024
 DCFormer (1024+not_compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is not used.
