@@ -20,20 +20,20 @@ accelerate=1.1.1
 
 ## Compare the time taken to run a single step between DCFormer-8B and Llama3-8B.
 
-Compare the time taken to run a single step between DCFormer-8B and Llama3-7B when the context lengths are 1024 and 4096, respectively.
+Compare the time taken to run a single step between DCFormer-8B and Llama3-8B when the context lengths are 1024 and 4096, respectively.
 
 ### when sequence length is 1024
 DCFormer (1024+not_compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is not used.
 
 DCFormer(1024+compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is used.
 
-Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is not used.
+Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is not used.
 
-Llama3(1024+not_FlashAttention+not_compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is not used.
+Llama3(1024+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is not used.
 
-Llama3(1024+FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is used and torch compilation is used.
+Llama3(1024+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is used.
 
-Llama3(1024+not_FlashAttention+compile) indicates that the text context length of Llama3-7B's training data is 1024, FlashAttention is not used and torch compilation is used.
+Llama3(1024+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is used.
 
 
 
