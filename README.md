@@ -16,7 +16,7 @@ In practice, we train DCFormer on TPU for efficiency and then infer on GPU for c
 
 ## News and Updates
 
-- [2025/2/13] We update the `pytorch/dcformer` folder, these scripts support the pre-training and supervised fine-tuning of the DCFormer model using DeepSpeed's ZeRO-0, ZeRO-1, ZeRO-2 and ZeRO-3 and Huggingface's trainer. Please refer to `pytorch/dcformer/README.md` for more traing details.
+- [2025/2/13] We update the `pytorch/dcformer` folder, these scripts support the pre-training and supervised fine-tuning of the DCFormer model using DeepSpeed's ZeRO-0, ZeRO-1, ZeRO-2, ZeRO-3 and Huggingface's trainer. Please refer to `pytorch/dcformer/README.md` for more traing details.
 
 ## Jax 
 
