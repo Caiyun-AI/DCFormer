@@ -23,9 +23,7 @@ accelerate=1.1.1
 <img src="https://github.com/Caiyun-AI/DCFormer/blob/lbb/pytorch/dcformer/img/dcformer%E5%92%8Cllama3%E5%8D%95%E6%AD%A5%E8%BF%90%E8%A1%8C%E6%97%B6%E9%97%B4%E5%AF%B9%E6%AF%94.png" width="2000">
 
 
-“`
-| 表头1 | 表头2 | 表头3 |
-| —— | —— | —— |
-| 单元格1 | 单元格2 | 单元格3 |
-| 单元格4 | 单元格5 | 单元格6 |
-“`
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
