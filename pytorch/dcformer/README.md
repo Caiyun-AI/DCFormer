@@ -25,17 +25,17 @@ The following experiments were conducted using H800 GPU, each GPU has 80GB of VR
 
 ### when sequence length is 1024
 
-DCFormer (1024+not_compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is not used.
+- DCFormer (1024+not_compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is not used.
 
-DCFormer(1024+compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is used.
+- DCFormer(1024+compile) indicates that the text context length of DCFormer-8B's training data is 1024, and torch compilation is used.
 
-Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is not used.
+- Llama3(1024+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is not used.
 
-Llama3(1024+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is not used.
+- Llama3(1024+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is not used.
 
-Llama3(1024+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is used.
+- Llama3(1024+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is used and torch compilation is used.
 
-Llama3(1024+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is used.
+- Llama3(1024+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 1024, FlashAttention is not used and torch compilation is used.
 
 
 
@@ -53,17 +53,17 @@ This table presents the time taken, in seconds, for DCFormer-8B and Llama3-8B to
 
 ### when sequence length is 4096
 
-DCFormer (4096+not_compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is not used.
+- DCFormer (4096+not_compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is not used.
 
-DCFormer(4096+compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is used.
+- DCFormer(4096+compile) indicates that the text context length of DCFormer-8B's training data is 4096, and torch compilation is used.
 
-Llama3(4096+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is not used.
+- Llama3(4096+FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is not used.
 
-Llama3(4096+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is not used.
+- Llama3(4096+not_FlashAttention+not_compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is not used.
 
-Llama3(4096+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is used.
+- Llama3(4096+FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is used and torch compilation is used.
 
-Llama3(4096+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is used.
+- Llama3(4096+not_FlashAttention+compile) indicates that the text context length of Llama3-8B's training data is 4096, FlashAttention is not used and torch compilation is used.
 
 
 
